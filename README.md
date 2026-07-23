@@ -2,6 +2,8 @@
 
 Prastuti is a real-time multilingual presentation product for classrooms, conferences, and live events. A presenter speaks once, while attendees listen and read in a preferred language from their own phones.
 
+Public website: [vinodspattar.in/prastuti-website](https://vinodspattar.in/prastuti-website/)
+
 The commercial model is prepaid usage credits, without subscription plans. Every credit load forms a separate lot that expires after 365 days.
 
 ## Run the product locally
