@@ -1,13 +1,42 @@
 # Prastuti
 
-Prastuti is a startup product concept for real-time multilingual presentations and classrooms. A presenter speaks once, while attendees listen and read in a preferred language from their own phones.
+Prastuti is a real-time multilingual presentation product for classrooms, conferences, and live events. A presenter speaks once, while attendees listen and read in a preferred language from their own phones.
 
 The commercial model is prepaid usage credits, without subscription plans. Every credit load forms a separate lot that expires after 365 days.
 
-## Workspace
+## Run the product locally
 
-- `Prastuti_PRD_v1.2.docx`: product requirements, credit lifecycle, startup assumptions, and serverless TypeScript architecture.
+The default development mode uses deterministic mock providers and requires no database, Redis service, payment account, speech account, or media infrastructure.
+
+```bash
+cd apps/web
+pnpm install
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). Run the automated infrastructure-free product smoke test with:
+
+```bash
+pnpm local:smoke
+```
+
+For persistence and coordination integration work, start the optional PostgreSQL and Valkey containers:
+
+```bash
+cd apps/web
+pnpm local:infra:up
+cp local.env.example .env.local
+pnpm local:db:migrate
+```
+
+See [local development](docs/LOCAL_DEVELOPMENT.md) for the supported modes and verification commands.
+
+## Repository
+
+- `Prastuti_PRD_v1.2.docx`: product requirements, credit lifecycle, and serverless TypeScript architecture.
 - `apps/web`: working Next.js and shadcn vertical slice.
+- `docs/architecture`: product architecture decisions.
+- `docs/OPEN_SOURCE_READINESS.md`: public-release checklist and remaining gates.
 
 ## Architecture direction
 
@@ -24,4 +53,10 @@ See [the serverless architecture](docs/architecture/serverless.md) for runtime b
 
 ## Current implementation boundary
 
-The prototype demonstrates product experience and deterministic credit-domain behavior. It does not process real payments, capture live audio, or call external speech providers. Those integrations are deliberately represented as the next production layer behind typed provider interfaces.
+The current build implements the product experience, deterministic credit-domain behavior, mock runtime, and local verification path. It does not process real payments, capture live audio, or call external speech providers. Those integrations remain behind typed provider boundaries and must pass provider-specific acceptance tests before production use.
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) before opening a change.
+
+The source license is intentionally pending maintainer selection. Until a `LICENSE` file is added, the repository can be reviewed but no open-source usage rights are granted.

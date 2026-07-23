@@ -25,26 +25,3 @@ export const SERVERLESS_COMPONENTS = [
     idleBehavior: "Steps execute only when work exists",
   },
 ] as const
-
-const requiredEnvironment = [
-  "DATABASE_URL",
-  "REALTIME_PROVIDER_URL",
-  "REALTIME_PROVIDER_API_KEY",
-  "REALTIME_PROVIDER_API_SECRET",
-  "SPEECH_PROVIDER_ENDPOINT",
-  "SPEECH_PROVIDER_API_KEY",
-  "PAYMENT_WEBHOOK_SECRET",
-] as const
-
-export function serverlessReadiness(
-  environment: Record<string, string | undefined>,
-) {
-  const missing = requiredEnvironment.filter((key) => !environment[key])
-
-  return {
-    ready: missing.length === 0,
-    configured: requiredEnvironment.length - missing.length,
-    required: requiredEnvironment.length,
-    missing,
-  }
-}

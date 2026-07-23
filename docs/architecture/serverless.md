@@ -70,6 +70,15 @@ flowchart LR
 - Do not schedule high-frequency cron requests because they prevent a clean idle period.
 - Put long-running or retryable post-session work in a durable workflow.
 
+## Local development boundary
+
+- Development defaults to deterministic mock adapters and requires no external infrastructure.
+- An optional Docker Compose profile provides PostgreSQL and Valkey for persistence and coordination integration.
+- The application selects `postgres-js` only for the local PostgreSQL profile; production remains on the Neon HTTP driver.
+- Mock payment behavior is disabled whenever managed runtime mode is selected.
+- Local product verification does not claim real speech quality, media fan-out, payment settlement, or provider latency.
+- Provider acceptance tests remain mandatory before a managed adapter is promoted to production.
+
 ## Provider decisions still required
 
 - Benchmark LiveKit Cloud, Ably, and equivalent managed transport options for India latency, fan-out cost, and data residency.

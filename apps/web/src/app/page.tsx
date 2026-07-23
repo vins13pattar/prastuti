@@ -240,7 +240,7 @@ export default function Home() {
                 Yes, the authored stack can be fully JavaScript and TypeScript.
               </h2>
               <p className="mt-6 text-lg leading-8 text-muted-foreground">
-                A single language keeps the startup fast. Browsers connect
+                A single language keeps product delivery cohesive. Browsers connect
                 directly to managed realtime and speech providers, while
                 short-lived functions handle tokens, wallet operations,
                 translation segments, and webhooks.
@@ -290,7 +290,7 @@ export default function Home() {
       </main>
 
       <footer className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-10 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-        <p>Prastuti product concept, 2026.</p>
+        <p>Prastuti, 2026.</p>
         <p>Designed for inclusion, clarity, and accountable usage.</p>
       </footer>
     </div>

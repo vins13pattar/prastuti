@@ -1,0 +1,55 @@
+name: Bug report
+description: Report reproducible incorrect product behavior
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, attendee data, recordings, transcripts, or security vulnerabilities. Follow SECURITY.md for private security reports.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest repeatable sequence using synthetic data.
+      placeholder: |
+        1. Start Prastuti in mock mode
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or version
+      placeholder: 4ab1c5f
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime mode
+      options:
+        - Mock, no infrastructure
+        - Docker-backed local integration
+        - Managed providers
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Additional context
+      description: Include sanitized logs or screenshots when useful.

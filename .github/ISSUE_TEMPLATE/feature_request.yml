@@ -1,0 +1,35 @@
+name: Product proposal
+description: Propose a product, contributor, or operator improvement
+title: "[Proposal]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Which user or contributor problem should Prastuti solve?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the behavior and how success can be observed.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Areas affected
+      options:
+        - label: Accessibility or language experience
+        - label: Credit accounting or payments
+        - label: Privacy or data retention
+        - label: Speech, realtime, or storage provider
+        - label: Local development
+        - label: Deployment or cost

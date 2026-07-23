@@ -1,13 +1,22 @@
 import { z } from "zod"
 
 import { creditExpiryFromLoadedAt } from "@/lib/credits"
+import { productRuntime } from "@/lib/runtime/product-runtime"
 
 const topUpSchema = z.object({
   credits: z.number().int().min(500).max(100000),
 })
 
 export async function POST(request: Request) {
-  const parsed = topUpSchema.safeParse(await request.json())
+  if (productRuntime().mode !== "mock") {
+    return Response.json(
+      { error: "The managed payment adapter is not configured." },
+      { status: 501 },
+    )
+  }
+
+  const body = await request.json().catch(() => null)
+  const parsed = topUpSchema.safeParse(body)
 
   if (!parsed.success) {
     return Response.json(

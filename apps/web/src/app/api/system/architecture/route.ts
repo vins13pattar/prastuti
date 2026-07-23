@@ -1,7 +1,7 @@
 import {
   SERVERLESS_COMPONENTS,
-  serverlessReadiness,
 } from "@/lib/serverless/architecture"
+import { productRuntime } from "@/lib/runtime/product-runtime"
 
 export const dynamic = "force-dynamic"
 
@@ -10,7 +10,7 @@ export function GET() {
     authoredStack: "TypeScript",
     target: "serverless-scale-to-zero",
     components: SERVERLESS_COMPONENTS,
-    integrations: serverlessReadiness(process.env),
+    runtime: productRuntime(),
     caveat:
       "Idle application compute can reach zero. Persistent storage, domains, and provider minimum charges may remain.",
   })

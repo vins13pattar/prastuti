@@ -11,7 +11,8 @@ const quoteSchema = z.object({
 })
 
 export async function POST(request: Request) {
-  const parsed = quoteSchema.safeParse(await request.json())
+  const body = await request.json().catch(() => null)
+  const parsed = quoteSchema.safeParse(body)
 
   if (!parsed.success) {
     return Response.json(
