@@ -1,17 +1,28 @@
 import { z } from "zod"
 
-import { creditExpiryFromLoadedAt } from "@/lib/credits"
 import { productRuntime } from "@/lib/runtime/product-runtime"
+import { loadCredits } from "@/lib/server/product-store"
+import {
+  authorizeOrganizerMutation,
+  noStoreHeaders,
+} from "@/lib/server/request-security"
 
 const topUpSchema = z.object({
   credits: z.number().int().min(500).max(100000),
 })
 
 export async function POST(request: Request) {
+  const organizer = await authorizeOrganizerMutation(request)
+  if (!organizer) {
+    return Response.json(
+      { error: "Organizer authorization failed." },
+      { status: 403, headers: noStoreHeaders() },
+    )
+  }
   if (productRuntime().mode !== "mock") {
     return Response.json(
       { error: "The managed payment adapter is not configured." },
-      { status: 501 },
+      { status: 501, headers: noStoreHeaders() },
     )
   }
 
@@ -21,22 +32,22 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return Response.json(
       { error: "Load between 500 and 100,000 credits." },
-      { status: 400 },
+      { status: 400, headers: noStoreHeaders() },
     )
   }
 
-  const loadedAt = new Date()
+  const lot = loadCredits(parsed.data.credits)
 
   return Response.json(
     {
       receipt: {
         id: crypto.randomUUID(),
         credits: parsed.data.credits,
-        loadedAt: loadedAt.toISOString(),
-        expiresAt: creditExpiryFromLoadedAt(loadedAt).toISOString(),
+        loadedAt: lot.loadedAt,
+        expiresAt: lot.expiresAt,
         status: "simulated",
       },
     },
-    { status: 201 },
+    { status: 201, headers: noStoreHeaders() },
   )
 }

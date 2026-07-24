@@ -1,7 +1,21 @@
-import { AppShell } from "@/components/app-shell"
+import { redirect } from "next/navigation"
 
-export default function ProductLayout({
+import { AppShell } from "@/components/app-shell"
+import { productRuntime } from "@/lib/runtime/product-runtime"
+import { currentOrganizerSession } from "@/lib/server/request-security"
+
+export default async function ProductLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return <AppShell>{children}</AppShell>
+  const session = await currentOrganizerSession()
+  if (!session) redirect("/local-sign-in")
+
+  return (
+    <AppShell
+      workspaceName={session.identity.workspaceName}
+      localMode={productRuntime().mode === "mock"}
+    >
+      {children}
+    </AppShell>
+  )
 }

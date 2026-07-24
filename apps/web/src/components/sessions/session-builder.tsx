@@ -2,7 +2,12 @@
 
 import { FormEvent, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowRight, FileUp, Headphones, Languages } from "lucide-react"
+import {
+  ArrowRight,
+  BookOpenText,
+  Headphones,
+  Languages,
+} from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { estimateCredits, formatCredits } from "@/lib/credits"
+import { organizerApi } from "@/lib/client/api"
+import type { ProductSession } from "@/lib/product/types"
 
 const availableLanguages = ["Kannada", "English", "Hindi", "Telugu"]
 
@@ -33,7 +40,15 @@ export function SessionBuilder() {
   const [source, setSource] = useState("Kannada")
   const [targets, setTargets] = useState(["English", "Hindi", "Telugu"])
   const [minutes, setMinutes] = useState("60")
+  const [glossary, setGlossary] = useState(
+    "embeddings, embeddings\nvector database, vector database",
+  )
+  const [notes, setNotes] = useState(
+    "Technical GenAI training. Preserve English technical terms when clearer.",
+  )
+  const [contextFileName, setContextFileName] = useState("")
   const [error, setError] = useState("")
+  const [pending, setPending] = useState(false)
 
   const quote = useMemo(
     () =>
@@ -58,7 +73,31 @@ export function SessionBuilder() {
     })
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function importContextFile(file: File | undefined) {
+    if (!file) return
+    setError("")
+    if (file.size > 256 * 1024) {
+      setError("Context files must be 256 KB or smaller.")
+      return
+    }
+    const allowedTypes = ["text/plain", "text/csv"]
+    if (
+      !allowedTypes.includes(file.type) &&
+      !file.name.toLowerCase().match(/\.(txt|csv)$/)
+    ) {
+      setError("Import a plain-text or CSV context file.")
+      return
+    }
+    const text = await file.text()
+    if (file.name.toLowerCase().endsWith(".csv")) {
+      setGlossary(text.slice(0, 20_000))
+    } else {
+      setNotes(text.slice(0, 5_000))
+    }
+    setContextFileName(file.name)
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (!name.trim()) {
@@ -67,7 +106,51 @@ export function SessionBuilder() {
     }
 
     setError("")
-    router.push("/sessions/live")
+    setPending(true)
+    try {
+      const created = await organizerApi<{ session: ProductSession }>(
+        "/api/sessions",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            sourceLanguage: source,
+            targetLanguages: targets,
+            expectedMinutes: Number(minutes),
+            translatedAudio: true,
+          }),
+        },
+      )
+      const glossaryItems = glossary
+        .split("\n")
+        .map((line) => line.split(",").map((part) => part.trim()))
+        .filter(
+          (parts): parts is [string, string] =>
+            Boolean(parts[0]) && Boolean(parts[1]),
+        )
+        .map(([sourceTerm, preferred]) => ({
+          source: sourceTerm,
+          preferred,
+        }))
+      await organizerApi(`/api/sessions/${created.session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operation: "context",
+          glossary: glossaryItems,
+          notes,
+        }),
+      })
+      router.push(`/sessions/${created.session.id}/live`)
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "The session could not be created.",
+      )
+      setPending(false)
+    }
   }
 
   return (
@@ -153,17 +236,60 @@ export function SessionBuilder() {
               onChange={(event) => setMinutes(event.target.value)}
             />
           </div>
-          <div className="rounded-xl border border-dashed border-border p-5">
+          <div className="grid gap-4 rounded-xl border border-dashed border-border p-5">
             <div className="flex items-start gap-3">
               <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted">
-                <FileUp className="size-5 text-muted-foreground" aria-hidden="true" />
+                <BookOpenText
+                  className="size-5 text-muted-foreground"
+                  aria-hidden="true"
+                />
               </span>
               <div>
                 <p className="font-medium">Presentation context</p>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  Upload slides and glossaries after creation. This vertical slice reserves the context meter automatically.
+                  Add terminology and session notes. These are applied to the
+                  deterministic local translator and included in the reserved
+                  context meter.
                 </p>
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="context-file">
+                Import local context (TXT or CSV)
+              </Label>
+              <Input
+                id="context-file"
+                type="file"
+                accept=".txt,.csv,text/plain,text/csv"
+                onChange={(event) =>
+                  void importContextFile(event.target.files?.[0])
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Processed in this browser, limited to 256 KB, and never served
+                back as active content.
+                {contextFileName ? ` Imported ${contextFileName}.` : ""}
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="glossary">Glossary, one pair per line</Label>
+              <textarea
+                id="glossary"
+                className="min-h-24 rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                value={glossary}
+                onChange={(event) => setGlossary(event.target.value)}
+                placeholder="source term, preferred translation"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="session-notes">Context notes</Label>
+              <textarea
+                id="session-notes"
+                className="min-h-20 rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                maxLength={5000}
+              />
             </div>
           </div>
           {error && (
@@ -203,8 +329,8 @@ export function SessionBuilder() {
                 <span>Audio + captions</span>
               </div>
             </div>
-            <Button type="submit" className="w-full">
-              Create session
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? "Creating session…" : "Create session"}
               <ArrowRight className="size-4" aria-hidden="true" />
             </Button>
             <p className="text-xs leading-relaxed text-muted-foreground">

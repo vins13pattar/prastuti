@@ -1,6 +1,7 @@
 "use client"
 
 import { FormEvent, useState } from "react"
+import { useRouter } from "next/navigation"
 import { CalendarClock, CheckCircle2, LoaderCircle, WalletCards } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -17,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { formatCredits } from "@/lib/credits"
+import { organizerApi } from "@/lib/client/api"
 
 type TopUpReceipt = {
   id: string
@@ -27,6 +29,7 @@ type TopUpReceipt = {
 }
 
 export function TopUpDialog() {
+  const router = useRouter()
   const [credits, setCredits] = useState("5000")
   const [receipt, setReceipt] = useState<TopUpReceipt | null>(null)
   const [error, setError] = useState("")
@@ -39,21 +42,17 @@ export function TopUpDialog() {
     setReceipt(null)
 
     try {
-      const response = await fetch("/api/credits/top-up", {
+      const body = await organizerApi<{ receipt: TopUpReceipt }>(
+        "/api/credits/top-up",
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credits: Number(credits) }),
-      })
-      const body = (await response.json()) as {
-        receipt?: TopUpReceipt
-        error?: string
-      }
-
-      if (!response.ok || !body.receipt) {
-        throw new Error(body.error ?? "The credit load could not be created.")
-      }
+        },
+      )
 
       setReceipt(body.receipt)
+      router.refresh()
     } catch (caught) {
       setError(
         caught instanceof Error

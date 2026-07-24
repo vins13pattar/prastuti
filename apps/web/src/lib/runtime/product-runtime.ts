@@ -4,6 +4,10 @@ export type ProductRuntimeMode = (typeof PRODUCT_RUNTIME_MODES)[number]
 
 const managedIntegrations = [
   {
+    name: "identity",
+    environment: ["AUTH_PROVIDER_ISSUER", "AUTH_PROVIDER_AUDIENCE"],
+  },
+  {
     name: "database",
     environment: ["DATABASE_URL"],
   },
