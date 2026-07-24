@@ -55,7 +55,17 @@ See [the serverless architecture](docs/architecture/serverless.md) for runtime b
 
 ## Current implementation boundary
 
-The current build implements the product experience, deterministic credit-domain behavior, mock runtime, and local verification path. It does not process real payments, capture live audio, or call external speech providers. Those integrations remain behind typed provider boundaries and must pass provider-specific acceptance tests before production use.
+The current build implements an infrastructure-free end-to-end path: local
+organizer identity, session creation, microphone preflight, optional browser
+speech recognition, deterministic multilingual captions, anonymous attendee
+joining, browser audio, corrections, credit reservation and settlement, and
+post-session transcript/summary downloads.
+
+Mock-mode state is process-local and resets with the development server. The
+application does not process real payments or call external speech, realtime,
+identity, storage, or translation providers. Durable managed adapters and their
+provider-specific acceptance tests remain required before production use. See
+[implementation status](docs/IMPLEMENTATION_STATUS.md).
 
 ## Contributing
 

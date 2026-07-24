@@ -1,6 +1,9 @@
 # Prastuti web
 
-Prastuti is an India-first live presentation translation product. This vertical slice includes the public launch page, organizer dashboard, prepaid credit wallet, session credit estimator, session builder, and demo live console.
+Prastuti is an India-first live presentation translation product. This
+vertical slice includes local organizer identity, session creation, presenter
+preflight, live captions, attendee joining, prepaid credit settlement, and
+post-session outputs.
 
 ## Run locally without infrastructure
 
@@ -11,7 +14,13 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Development defaults to `PRASTUTI_RUNTIME_MODE=mock`. The product pages, deterministic credit behavior, and simulated top-up need no cloud accounts or Docker services.
+Development defaults to `PRASTUTI_RUNTIME_MODE=mock`. Enter the local workspace,
+create a session, start it, open the QR attendee view in another tab, and add a
+deterministic or manual caption. Optional microphone preflight and Chromium's
+browser speech-recognition API can provide local presenter input.
+
+Local workspace data is intentionally process-local and resets when the
+development server restarts. It needs no cloud accounts or Docker services.
 
 Run the automated local product check:
 
@@ -34,8 +43,16 @@ pnpm verify
 - Each lot expires 365 days after its confirmed loading timestamp.
 - Reservations draw from the earliest-expiring eligible lot first.
 - Sessions reserve an estimate, meter actual usage, and return unused credits to the original lots.
-- Credit quote and mock-only top-up endpoints are implemented as Route Handlers.
-- Payment, speech, storage, authentication, and live media providers are not connected.
+- Local organizer sessions use bounded opaque HttpOnly cookies and CSRF
+  protection; attendee sessions are anonymous and scoped to a join code.
+- Session creation, context import, start/pause/resume/stop, QR join, caption
+  delivery, correction, and artifact download use real Route Handlers.
+- Starting reserves the estimate from the earliest-expiring lots. Stopping
+  consumes actual local usage and releases the remainder.
+- The local speech path supports microphone preflight, optional browser speech
+  recognition, deterministic translation, and browser speech synthesis.
+- Managed identity, durable persistence, payment, speech, realtime, and object
+  storage adapters are defined as production boundaries but are not connected.
 
 The sample rate card supports product evaluation. It is not approved public pricing.
 
@@ -63,7 +80,11 @@ cp local.env.example .env.local
 pnpm local:db:migrate
 ```
 
-The initial migration defines organizations, sessions, credit lots, immutable ledger entries, and usage meters. Production uses the Neon HTTP driver; optional local integration uses PostgreSQL through `postgres-js`. Database initialization is lazy, so mock mode and builds do not require `DATABASE_URL`.
+The initial migration defines organizations, sessions, credit lots, immutable
+ledger entries, and usage meters. Production uses the Neon HTTP driver; local
+schema integration uses PostgreSQL through `postgres-js`. The product APIs
+currently use the process-local mock repository; wiring those APIs to the
+Postgres repository is a remaining managed-mode task.
 
 ## Deployment readiness
 

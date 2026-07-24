@@ -19,7 +19,10 @@ pnpm install
 pnpm dev
 ```
 
-When `PRASTUTI_RUNTIME_MODE` is unset outside production, Prastuti selects `mock`. The runtime uses deterministic provider boundaries, sample product data, simulated top-ups, and no external credentials.
+When `PRASTUTI_RUNTIME_MODE` is unset outside production, Prastuti selects
+`mock`. The runtime uses a process-local repository, opaque local organizer
+sessions, deterministic translation, browser media APIs, simulated top-ups,
+and no external credentials. State resets when the Next.js process restarts.
 
 Verify the complete local surface:
 
@@ -27,7 +30,10 @@ Verify the complete local surface:
 pnpm local:smoke
 ```
 
-The smoke test starts an isolated development server, checks the homepage, dashboard, credits page, health endpoint, credit quote, and simulated top-up, then shuts the server down.
+The smoke test starts an isolated development server and verifies security
+headers, organizer identity, credit loading, session creation, context,
+reservation, attendee joining, caption delivery, correction, settlement, and
+post-session artifacts before shutting the server down.
 
 ## Mode 2: Docker-backed integration mode
 
@@ -52,8 +58,8 @@ Services bind only to local development ports by default:
 
 | Service | Host port | Purpose |
 | --- | ---: | --- |
-| PostgreSQL | `54329` | Durable product data and credit-ledger integration |
-| Valkey | `63799` | Redis-compatible coordination integration |
+| PostgreSQL | `54329` | Schema and migration integration |
+| Valkey | `63799` | Future coordination-adapter integration |
 
 Stop the containers while retaining PostgreSQL data:
 
@@ -88,7 +94,16 @@ This runs unit tests, TypeScript checks, linting, migration validation, a produc
 
 ## Local media testing
 
-The current build represents speech and realtime systems through mock provider boundaries. It does not claim locally generated translation audio. When the realtime adapter is implemented, LiveKit can run locally in development mode; provider-specific setup will be added with that adapter rather than introducing an unused always-on service now.
+Open a created session and select **Check microphone** to validate browser
+capture and input level. Chromium-based browsers may expose **Use browser
+captions**; availability and processing behavior depend on the browser.
+Deterministic and manual caption controls always work without media access.
+
+Open the attendee link or scan its QR code in another browser tab. Select
+**Enable audio** to synthesize each new translated caption with the browser's
+speech synthesis engine. This explicit gesture satisfies browser autoplay
+rules. No audio or transcript is sent to a Prastuti-managed external provider
+in mock mode.
 
 ## Troubleshooting
 
