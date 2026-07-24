@@ -19,11 +19,11 @@ This checklist separates repository preparation from the irreversible public-rel
 - [x] Redacted secret scan across all reachable Git history found no leaks
 - [x] Intended publishable working tree secret scan found no leaks
 - [x] Tracked PRD metadata was scrubbed and the rendered document was visually reviewed
+- [x] MIT source license selected and added
+- [x] Copyright holder text confirmed as `Prastuti contributors`
 
 ## Required before making the repository public
 
-- [ ] Select and add a source license
-- [ ] Confirm the copyright holder text
 - [ ] Enable GitHub private vulnerability reporting
 - [ ] Confirm repository description, topics, social preview, and public contact path
 - [ ] Confirm branch protection and required CI checks on `main`
@@ -31,14 +31,8 @@ This checklist separates repository preparation from the irreversible public-rel
 
 ## License decision
 
-No `LICENSE` file is present. Until the maintainer selects a license, source availability does not grant open-source reuse rights.
-
-Two common choices for this product are:
-
-- Apache License 2.0: permissive reuse with an explicit patent grant.
-- GNU Affero General Public License v3.0: reciprocal source-sharing obligations, including modified network services.
-
-This document records options but does not choose on behalf of the copyright holder.
+Prastuti is licensed under the MIT License with the copyright holder text
+`Copyright (c) 2026 Prastuti contributors`.
 
 ## Release evidence
 
@@ -49,7 +43,7 @@ Before public release, record:
 - dependency-audit results and any accepted exceptions;
 - secret-scan version, scope, and redacted finding disposition;
 - document metadata and binary review results;
-- the selected license and copyright holder.
+- the MIT license and `Prastuti contributors` copyright holder text.
 
 Current evidence was collected on 24 July 2026. Gitleaks v8.30.1 scanned the
 complete reachable history and the intended publishable working tree without

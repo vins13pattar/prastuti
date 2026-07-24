@@ -61,4 +61,4 @@ The current build implements the product experience, deterministic credit-domain
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) before opening a change.
 
-The source license is intentionally pending maintainer selection. Until a `LICENSE` file is added, the repository can be reviewed but no open-source usage rights are granted.
+Prastuti is available under the [MIT License](LICENSE).

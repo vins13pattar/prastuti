@@ -59,4 +59,4 @@ Keep pull requests focused and explain:
 - tests and manual verification performed;
 - any remaining provider or production gates.
 
-The project license is pending maintainer selection. A `LICENSE` file will be added before the repository becomes public.
+By contributing to Prastuti, you agree that your contributions will be licensed under the [MIT License](LICENSE).
