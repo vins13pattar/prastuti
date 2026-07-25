@@ -22,7 +22,7 @@ Open [http://localhost:3000](http://localhost:3000). Run the automated infrastru
 pnpm local:smoke
 ```
 
-For persistence and coordination integration work, start the optional PostgreSQL and Valkey containers:
+For persistence and transaction integration work, start the optional PostgreSQL and Valkey containers:
 
 ```bash
 cd apps/web
@@ -48,24 +48,30 @@ All authored application code is TypeScript. The target runtime is serverless-fi
 - Neon Postgres and Drizzle for the credit ledger.
 - Upstash Redis for ephemeral coordination and rate limiting.
 - Vercel Blob for uploaded presentation assets.
-- Managed speech and WebRTC or realtime providers for persistent live connections.
-- Durable TypeScript workflows for post-session work, subject to beta exit criteria.
+- Azure Speech and Translator for recognition, translation, and per-language audio.
+- Ably for scoped realtime caption fan-out.
+- Razorpay for prepaid credit checkout and signed webhook reconciliation.
+- Vercel Workflow for post-session artifacts and retention work.
 
 See [the serverless architecture](docs/architecture/serverless.md) for runtime boundaries and cost guardrails.
 
-## Current implementation boundary
+## Implementation boundary
 
-The current build implements an infrastructure-free end-to-end path: local
-organizer identity, session creation, microphone preflight, optional browser
-speech recognition, deterministic multilingual captions, anonymous attendee
-joining, browser audio, corrections, credit reservation and settlement, and
-post-session transcript/summary downloads.
+The repository contains two complete runtime paths:
 
-Mock-mode state is process-local and resets with the development server. The
-application does not process real payments or call external speech, realtime,
-identity, storage, or translation providers. Durable managed adapters and their
-provider-specific acceptance tests remain required before production use. See
-[implementation status](docs/IMPLEMENTATION_STATUS.md).
+- `mock` runs the organizer-to-attendee product flow with deterministic
+  providers and no accounts or infrastructure;
+- `managed` uses Clerk, Postgres, Upstash, Vercel Blob, Cloudmersive, Azure,
+  Ably, Razorpay, and Vercel Workflow, and fails closed when required
+  configuration is absent.
+
+Docker-backed tests exercise durable credit lots, payment idempotency,
+concurrent reservation, metered settlement, assets, captions, and artifacts
+without using paid infrastructure. Real-provider acceptance, approved pricing
+and tax/refund operations, operational alerting, and deployment of the
+authenticated product remain release gates. See
+[implementation status](docs/IMPLEMENTATION_STATUS.md) and
+[production operations](docs/PRODUCTION_OPERATIONS.md).
 
 ## Contributing
 

@@ -37,7 +37,8 @@ post-session artifacts before shutting the server down.
 
 ## Mode 2: Docker-backed integration mode
 
-Use this mode when changing schemas, migrations, persistence, or coordination behavior.
+Use this mode when changing schemas, migrations, persistence, payment
+reconciliation, or credit consistency.
 
 Prerequisites:
 
@@ -59,7 +60,20 @@ Services bind only to local development ports by default:
 | Service | Host port | Purpose |
 | --- | ---: | --- |
 | PostgreSQL | `54329` | Schema and migration integration |
-| Valkey | `63799` | Future coordination-adapter integration |
+| Valkey | `63799` | Local compatibility service for future coordination tests |
+
+Run the persistent product path and database invariants:
+
+```bash
+pnpm local:persistent:smoke
+pnpm local:postgres:verify
+```
+
+The persistent smoke uses the real Postgres repository while retaining
+deterministic local identity, payment, speech, and realtime providers. The
+invariant verifier directly tests webhook replay, amount mismatch, exact
+expiry, concurrent reservation, insufficient balance, usage meters, and
+settlement.
 
 Stop the containers while retaining PostgreSQL data:
 
@@ -90,7 +104,10 @@ cd apps/web
 pnpm verify
 ```
 
-This runs unit tests, TypeScript checks, linting, migration validation, a production build, and the infrastructure-free product smoke test.
+This runs unit tests, TypeScript checks, linting, migration validation, a
+production build, and the infrastructure-free product smoke test. When Docker
+is available, also run the two persistent commands above; CI runs them against
+PostgreSQL 17.
 
 ## Local media testing
 

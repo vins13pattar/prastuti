@@ -51,8 +51,12 @@ pnpm verify
   consumes actual local usage and releases the remainder.
 - The local speech path supports microphone preflight, optional browser speech
   recognition, deterministic translation, and browser speech synthesis.
-- Managed identity, durable persistence, payment, speech, realtime, and object
-  storage adapters are defined as production boundaries but are not connected.
+- Managed mode connects Clerk identity, durable Postgres repositories, Upstash
+  rate limiting, private Vercel Blob assets, Cloudmersive malware scanning,
+  Azure speech/translation/audio, scoped Ably realtime, signed Razorpay
+  checkout/webhooks, and Vercel Workflow finalization.
+- Managed mode fails closed when a required provider or security setting is
+  absent. Mock behavior is never substituted in production.
 
 The sample rate card supports product evaluation. It is not approved public pricing.
 
@@ -64,7 +68,9 @@ All authored product code can remain in TypeScript:
 - Vercel Functions for stateless token, segment, wallet, webhook, and settlement APIs.
 - Neon Postgres through its HTTP driver, with Drizzle ORM and checked-in migrations.
 - Upstash Redis for ephemeral coordination and rate limiting.
-- Managed speech, WebRTC, and realtime providers for persistent live connections.
+- Azure Speech and Translator for recognition, translation, and audio.
+- Ably for persistent, scoped realtime connections.
+- Razorpay for prepaid checkout and idempotent webhook reconciliation.
 - Durable TypeScript workflows for uploads, summaries, reconciliation, and post-session jobs.
 - Typed adapters for speech, translation, media, payments, object storage, and identity.
 
@@ -80,12 +86,26 @@ cp local.env.example .env.local
 pnpm local:db:migrate
 ```
 
-The initial migration defines organizations, sessions, credit lots, immutable
-ledger entries, and usage meters. Production uses the Neon HTTP driver; local
-schema integration uses PostgreSQL through `postgres-js`. The product APIs
-currently use the process-local mock repository; wiring those APIs to the
-Postgres repository is a remaining managed-mode task.
+The checked-in migrations define organizations and memberships, sessions,
+caption/audio records, credit lots, immutable ledger entries, reservations,
+usage meters, payment events, private presentation assets, artifacts, and
+audit events. Atomic database functions protect top-up reconciliation,
+earliest-expiry reservation, and metered settlement. Managed mode uses the
+Neon HTTP driver; local persistence tests use PostgreSQL through `postgres-js`.
+
+Run the durable integration checks with:
+
+```bash
+pnpm local:infra:up
+pnpm local:db:migrate
+pnpm local:persistent:smoke
+pnpm local:postgres:verify
+```
 
 ## Deployment readiness
 
-Copy `.env.example` to `.env.local`, select managed runtime mode, and configure providers. The read-only `/api/system/architecture` and `/api/system/health` endpoints report adapter status and missing environment variable names without exposing secret values.
+Copy `.env.example` to `.env.local`, select managed runtime mode, and configure
+providers. The read-only `/api/system/architecture` and `/api/system/health`
+endpoints report adapter status and missing environment variable names without
+exposing secret values. Follow
+[production operations](../../docs/PRODUCTION_OPERATIONS.md) before deploying.
