@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 
 import { AttendeeRoom } from "@/components/attendee/attendee-room"
 import { Brand } from "@/components/brand"
+import { productRuntime } from "@/lib/runtime/product-runtime"
 
 export const metadata: Metadata = {
   title: "Join live captions",
@@ -22,7 +23,10 @@ export default async function JoinPage({ params }: PageProps) {
         <p className="text-xs text-muted-foreground">Attendee view</p>
       </div>
       <div className="mx-auto flex max-w-5xl justify-center">
-        <AttendeeRoom joinCode={joinCode.toUpperCase()} />
+        <AttendeeRoom
+          joinCode={joinCode.toUpperCase()}
+          managedProviders={productRuntime().mode === "managed"}
+        />
       </div>
     </main>
   )

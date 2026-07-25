@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import { LiveConsole } from "@/components/sessions/live-console"
+import { productRuntime } from "@/lib/runtime/product-runtime"
 
 export const metadata: Metadata = {
   title: "Live console",
@@ -24,7 +25,10 @@ export default async function LiveSessionPage({ params }: PageProps) {
           correct the transcript, and generate session outputs.
         </p>
       </div>
-      <LiveConsole sessionId={sessionId} />
+      <LiveConsole
+        sessionId={sessionId}
+        managedProviders={productRuntime().mode === "managed"}
+      />
     </div>
   )
 }

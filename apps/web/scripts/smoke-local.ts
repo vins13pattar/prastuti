@@ -161,6 +161,73 @@ async function run() {
     throw new Error("Session creation smoke test failed.")
   }
 
+  const presentationForm = new FormData()
+  presentationForm.set(
+    "file",
+    new File(
+      ["Retrieval augmented generation\nPreserve vector database terminology."],
+      "acceptance-context.txt",
+      { type: "text/plain" },
+    ),
+  )
+  const presentationResponse = await fetch(
+    `${origin}/api/sessions/${created.session.id}/assets`,
+    {
+      method: "POST",
+      headers: {
+        Cookie: organizerCookie,
+        Origin: origin,
+        "x-csrf-token": identity.csrfToken,
+      },
+      body: presentationForm,
+    },
+  )
+  const presentation = (await presentationResponse.json()) as {
+    asset?: { scanStatus?: string; extractedText?: string }
+  }
+  if (
+    presentationResponse.status !== 201 ||
+    presentation.asset?.scanStatus !== "clean" ||
+    !presentation.asset.extractedText?.includes("vector database")
+  ) {
+    throw new Error(
+      `Presentation validation and extraction failed (${presentationResponse.status}, ${JSON.stringify(presentation)}).`,
+    )
+  }
+
+  const malwareForm = new FormData()
+  malwareForm.set(
+    "file",
+    new File(
+      [
+        "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!",
+      ],
+      "blocked-context.txt",
+      { type: "text/plain" },
+    ),
+  )
+  const malwareResponse = await fetch(
+    `${origin}/api/sessions/${created.session.id}/assets`,
+    {
+      method: "POST",
+      headers: {
+        Cookie: organizerCookie,
+        Origin: origin,
+        "x-csrf-token": identity.csrfToken,
+      },
+      body: malwareForm,
+    },
+  )
+  const malwareBody = (await malwareResponse.json()) as { error?: string }
+  if (
+    malwareResponse.status !== 422 ||
+    !malwareBody.error?.includes("malware")
+  ) {
+    throw new Error(
+      `Malware rejection smoke test failed (${malwareResponse.status}, ${JSON.stringify(malwareBody)}).`,
+    )
+  }
+
   const contextResponse = await fetch(
     `${origin}/api/sessions/${created.session.id}`,
     {
@@ -276,7 +343,7 @@ async function run() {
   }
 
   console.log(
-    "Local smoke test passed: auth, session creation, reservation, attendee join, captions, correction, settlement, and artifacts.",
+    "Local smoke test passed: auth, presentation scan/extraction and malware rejection, session creation, reservation, attendee join, captions, correction, settlement, and artifacts.",
   )
 }
 

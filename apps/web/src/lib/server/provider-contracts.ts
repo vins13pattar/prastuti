@@ -78,7 +78,7 @@ export function providerBoundaries(): ProviderBoundary[] {
     ]
   }
 
-  return [
+  const managedCapabilities = [
     "identity",
     "persistence",
     "realtime",
@@ -86,9 +86,25 @@ export function providerBoundaries(): ProviderBoundary[] {
     "translation",
     "audio",
     "payments",
-  ].map((capability) => ({
-    capability: capability as ProviderCapability,
-    adapter: "unconfigured" as const,
+  ] as const
+  const integrationName: Record<ProviderCapability, string> = {
+    identity: "identity",
+    persistence: "database",
+    realtime: "realtime",
+    speech: "speech",
+    translation: "speech",
+    audio: "speech",
+    payments: "payments",
+  }
+  return managedCapabilities.map((capability) => ({
+    capability,
+    adapter:
+      runtime.integrations.find(
+        (integration) =>
+          integration.name === integrationName[capability],
+      )?.adapter === "managed"
+        ? ("managed" as const)
+        : ("unconfigured" as const),
     execution: "managed-service" as const,
     scaleToZero: true,
   }))

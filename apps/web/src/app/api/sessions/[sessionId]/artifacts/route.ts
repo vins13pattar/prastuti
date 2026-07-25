@@ -3,7 +3,7 @@ import { z } from "zod"
 import {
   buildSessionArtifacts,
   sessionById,
-} from "@/lib/server/product-store"
+} from "@/lib/server/product-repository"
 import {
   currentOrganizerSession,
   noStoreHeaders,
@@ -34,7 +34,7 @@ export async function GET(request: Request, context: RouteContext) {
     )
   }
   const { sessionId } = await context.params
-  const session = sessionById(sessionId)
+  const session = await sessionById(sessionId)
   if (!session || session.organizationId !== organizer.identity.organizationId) {
     return Response.json(
       { error: "Session not found." },

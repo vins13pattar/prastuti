@@ -1,0 +1,1 @@
+ALTER TABLE "caption_segments" ADD COLUMN "audio_references" jsonb DEFAULT '{}'::jsonb NOT NULL;

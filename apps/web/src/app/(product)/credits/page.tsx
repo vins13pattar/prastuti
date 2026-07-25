@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatCredits } from "@/lib/credits"
-import { workspaceSnapshot } from "@/lib/server/product-store"
+import { workspaceSnapshot } from "@/lib/server/product-repository"
 import { currentOrganizerSession } from "@/lib/server/request-security"
 
 export const dynamic = "force-dynamic"
@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic"
 export default async function CreditsPage() {
   const organizer = await currentOrganizerSession()
   if (!organizer) return null
-  const wallet = workspaceSnapshot(organizer.identity).wallet
+  const wallet = (await workspaceSnapshot(organizer.identity)).wallet
 
   return (
     <div className="mx-auto max-w-7xl space-y-7">

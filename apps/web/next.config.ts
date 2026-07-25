@@ -1,4 +1,5 @@
 import type { NextConfig } from "next"
+import { withWorkflow } from "workflow/next"
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -7,11 +8,12 @@ const nextConfig: NextConfig = {
     const development = process.env.NODE_ENV !== "production"
     const contentSecurityPolicy = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${development ? " 'unsafe-eval'" : ""}`,
+      `script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://*.clerk.accounts.dev https://*.clerk.com${development ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      `connect-src 'self'${development ? " ws: wss:" : ""}`,
+      `connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://api.razorpay.com https://*.ably.io https://*.ably.net https://*.ably-realtime.com wss://*.ably.io wss://*.ably.net wss://*.ably-realtime.com https://*.speech.microsoft.com wss://*.speech.microsoft.com${development ? " ws: wss:" : ""}`,
+      "frame-src 'self' https://api.razorpay.com https://*.clerk.accounts.dev https://*.clerk.com",
       "media-src 'self' blob:",
       "worker-src 'self' blob:",
       "object-src 'none'",
@@ -59,4 +61,4 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+export default withWorkflow(nextConfig)

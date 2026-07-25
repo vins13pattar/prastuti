@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
@@ -27,7 +28,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
+  const content = (
     <html
       lang="en"
       suppressHydrationWarning
@@ -45,5 +46,11 @@ export default function RootLayout({
         </ThemeProvider>
       </body>
     </html>
+  );
+
+  return process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+    <ClerkProvider>{content}</ClerkProvider>
+  ) : (
+    content
   );
 }

@@ -1,13 +1,18 @@
 import { z } from "zod"
 
+import { recordAuditEvent } from "@/lib/server/audit"
 import {
   appendSegment,
   sessionById,
-} from "@/lib/server/product-store"
+} from "@/lib/server/product-repository"
 import {
   authorizeOrganizerMutation,
   noStoreHeaders,
 } from "@/lib/server/request-security"
+import {
+  checkRateLimit,
+  rateLimitResponse,
+} from "@/lib/server/rate-limit"
 
 type RouteContext = {
   params: Promise<{ sessionId: string }>
@@ -25,6 +30,12 @@ export async function POST(request: Request, context: RouteContext) {
       { status: 403, headers: noStoreHeaders() },
     )
   }
+  const rateLimit = await checkRateLimit(request, "caption-segment", {
+    identifier: `caption-segment:${organizer.identity.id}`,
+    limit: 240,
+    windowSeconds: 60,
+  })
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit)
   const input = segmentSchema.safeParse(
     await request.json().catch(() => ({})),
   )
@@ -35,7 +46,7 @@ export async function POST(request: Request, context: RouteContext) {
     )
   }
   const { sessionId } = await context.params
-  const session = sessionById(sessionId)
+  const session = await sessionById(sessionId)
   if (!session || session.organizationId !== organizer.identity.organizationId) {
     return Response.json(
       { error: "Session not found." },
@@ -43,9 +54,18 @@ export async function POST(request: Request, context: RouteContext) {
     )
   }
   try {
-    const segment = appendSegment(session, input.data.sourceText)
+    const segment = await appendSegment(session, input.data.sourceText)
+    await recordAuditEvent({
+      request,
+      identity: organizer.identity,
+      action: "caption.created",
+      targetType: "caption_segment",
+      targetId: segment.id,
+      outcome: "succeeded",
+      metadata: { sessionId: session.id },
+    })
     return Response.json(
-      { segment, session },
+      { segment, session: await sessionById(session.id) },
       { status: 201, headers: noStoreHeaders() },
     )
   } catch (error) {

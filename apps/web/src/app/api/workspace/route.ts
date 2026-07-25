@@ -1,4 +1,4 @@
-import { workspaceSnapshot } from "@/lib/server/product-store"
+import { workspaceSnapshot } from "@/lib/server/product-repository"
 import {
   currentOrganizerSession,
   noStoreHeaders,
@@ -12,7 +12,7 @@ export async function GET() {
       { status: 401, headers: noStoreHeaders() },
     )
   }
-  return Response.json(workspaceSnapshot(organizer.identity), {
+  return Response.json(await workspaceSnapshot(organizer.identity), {
     headers: noStoreHeaders(),
   })
 }

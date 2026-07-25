@@ -39,8 +39,8 @@ type ProductStore = {
 }
 
 const LOCAL_IDENTITY: OrganizerIdentity = {
-  id: "organizer_local",
-  organizationId: "org_local",
+  id: "00000000-0000-4000-8000-000000000002",
+  organizationId: "00000000-0000-4000-8000-000000000001",
   displayName: "Local organizer",
   workspaceName: "Prastuti local workspace",
 }

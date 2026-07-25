@@ -47,6 +47,7 @@ export function SessionBuilder() {
     "Technical GenAI training. Preserve English technical terms when clearer.",
   )
   const [contextFileName, setContextFileName] = useState("")
+  const [contextFile, setContextFile] = useState<File | null>(null)
   const [error, setError] = useState("")
   const [pending, setPending] = useState(false)
 
@@ -76,24 +77,32 @@ export function SessionBuilder() {
   async function importContextFile(file: File | undefined) {
     if (!file) return
     setError("")
-    if (file.size > 256 * 1024) {
-      setError("Context files must be 256 KB or smaller.")
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Presentation files must be 10 MB or smaller.")
       return
     }
-    const allowedTypes = ["text/plain", "text/csv"]
+    const allowedTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "text/plain",
+      "text/csv",
+    ]
     if (
       !allowedTypes.includes(file.type) &&
-      !file.name.toLowerCase().match(/\.(txt|csv)$/)
+      !file.name.toLowerCase().match(/\.(pdf|pptx|txt|csv)$/)
     ) {
-      setError("Import a plain-text or CSV context file.")
+      setError("Upload a PDF, PPTX, TXT, or CSV presentation file.")
       return
     }
-    const text = await file.text()
-    if (file.name.toLowerCase().endsWith(".csv")) {
-      setGlossary(text.slice(0, 20_000))
-    } else {
-      setNotes(text.slice(0, 5_000))
+    if (file.name.toLowerCase().match(/\.(txt|csv)$/)) {
+      const text = await file.text()
+      if (file.name.toLowerCase().endsWith(".csv")) {
+        setGlossary(text.slice(0, 20_000))
+      } else {
+        setNotes(text.slice(0, 5_000))
+      }
     }
+    setContextFile(file)
     setContextFileName(file.name)
   }
 
@@ -133,13 +142,30 @@ export function SessionBuilder() {
           source: sourceTerm,
           preferred,
         }))
+      let extractedContext = ""
+      if (contextFile) {
+        const form = new FormData()
+        form.set("file", contextFile)
+        const uploaded = await organizerApi<{
+          asset: { extractedText: string }
+        }>(`/api/sessions/${created.session.id}/assets`, {
+          method: "POST",
+          body: form,
+        })
+        if (contextFile.name.toLowerCase().match(/\.(pdf|pptx)$/)) {
+          extractedContext = uploaded.asset.extractedText
+        }
+      }
       await organizerApi(`/api/sessions/${created.session.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           operation: "context",
           glossary: glossaryItems,
-          notes,
+          notes: [notes, extractedContext]
+            .filter(Boolean)
+            .join("\n\n")
+            .slice(0, 5_000),
         }),
       })
       router.push(`/sessions/${created.session.id}/live`)
@@ -255,19 +281,20 @@ export function SessionBuilder() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="context-file">
-                Import local context (TXT or CSV)
+                Upload presentation context
               </Label>
               <Input
                 id="context-file"
                 type="file"
-                accept=".txt,.csv,text/plain,text/csv"
+                accept=".pdf,.pptx,.txt,.csv,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv"
                 onChange={(event) =>
                   void importContextFile(event.target.files?.[0])
                 }
               />
               <p className="text-xs text-muted-foreground">
-                Processed in this browser, limited to 256 KB, and never served
-                back as active content.
+                PDF, PPTX, TXT, or CSV up to 10 MB. Files are validated,
+                scanned, stored outside the public web root, and retained for
+                30 days.
                 {contextFileName ? ` Imported ${contextFileName}.` : ""}
               </p>
             </div>

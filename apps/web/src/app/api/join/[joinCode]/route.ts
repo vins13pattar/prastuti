@@ -3,12 +3,16 @@ import { cookies } from "next/headers"
 import {
   createAttendeeSession,
   sessionByJoinCode,
-} from "@/lib/server/product-store"
+} from "@/lib/server/product-repository"
 import {
   ATTENDEE_COOKIE,
   noStoreHeaders,
   requireSameOrigin,
 } from "@/lib/server/request-security"
+import {
+  checkRateLimit,
+  rateLimitResponse,
+} from "@/lib/server/rate-limit"
 
 type RouteContext = {
   params: Promise<{ joinCode: string }>
@@ -16,7 +20,7 @@ type RouteContext = {
 
 export async function GET(_request: Request, context: RouteContext) {
   const { joinCode } = await context.params
-  const session = sessionByJoinCode(joinCode)
+  const session = await sessionByJoinCode(joinCode)
   if (!session) {
     return Response.json(
       { error: "This session could not be found." },
@@ -38,6 +42,11 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function POST(request: Request, context: RouteContext) {
+  const rateLimit = await checkRateLimit(request, "attendee-join", {
+    limit: 30,
+    windowSeconds: 60,
+  })
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit)
   if (!requireSameOrigin(request)) {
     return Response.json(
       { error: "The join request must come from this application." },
@@ -45,7 +54,7 @@ export async function POST(request: Request, context: RouteContext) {
     )
   }
   const { joinCode } = await context.params
-  const result = createAttendeeSession(joinCode)
+  const result = await createAttendeeSession(joinCode)
   if (!result) {
     return Response.json(
       { error: "This session is not accepting attendees yet." },
@@ -63,6 +72,7 @@ export async function POST(request: Request, context: RouteContext) {
   return Response.json(
     {
       attendeeId: result.attendee.attendeeId,
+      sessionId: result.attendee.sessionId,
       csrfToken: result.attendee.csrfToken,
     },
     { status: 201, headers: noStoreHeaders() },

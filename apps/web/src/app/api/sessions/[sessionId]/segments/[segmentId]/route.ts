@@ -1,9 +1,10 @@
 import { z } from "zod"
 
+import { recordAuditEvent } from "@/lib/server/audit"
 import {
   correctSegment,
   sessionById,
-} from "@/lib/server/product-store"
+} from "@/lib/server/product-repository"
 import {
   authorizeOrganizerMutation,
   noStoreHeaders,
@@ -35,19 +36,35 @@ export async function PATCH(request: Request, context: RouteContext) {
     )
   }
   const { sessionId, segmentId } = await context.params
-  const session = sessionById(sessionId)
+  const session = await sessionById(sessionId)
   if (!session || session.organizationId !== organizer.identity.organizationId) {
     return Response.json(
       { error: "Session not found." },
       { status: 404, headers: noStoreHeaders() },
     )
   }
-  const segment = correctSegment(session, segmentId, input.data.sourceText)
+  const segment = await correctSegment(
+    session,
+    segmentId,
+    input.data.sourceText,
+  )
   if (!segment) {
     return Response.json(
       { error: "Caption segment not found." },
       { status: 404, headers: noStoreHeaders() },
     )
   }
-  return Response.json({ segment, session }, { headers: noStoreHeaders() })
+  await recordAuditEvent({
+    request,
+    identity: organizer.identity,
+    action: "caption.corrected",
+    targetType: "caption_segment",
+    targetId: segment.id,
+    outcome: "succeeded",
+    metadata: { sessionId: session.id },
+  })
+  return Response.json(
+    { segment, session: await sessionById(session.id) },
+    { headers: noStoreHeaders() },
+  )
 }

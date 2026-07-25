@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatCredits } from "@/lib/credits"
-import { workspaceSnapshot } from "@/lib/server/product-store"
+import { workspaceSnapshot } from "@/lib/server/product-repository"
 import { currentOrganizerSession } from "@/lib/server/request-security"
 
 export const dynamic = "force-dynamic"
@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic"
 export default async function DashboardPage() {
   const organizer = await currentOrganizerSession()
   if (!organizer) return null
-  const workspace = workspaceSnapshot(organizer.identity)
+  const workspace = await workspaceSnapshot(organizer.identity)
   const used = workspace.sessions.reduce(
     (total, session) => total + session.consumedCredits,
     0,
@@ -52,8 +52,8 @@ export default async function DashboardPage() {
             {workspace.identity.workspaceName}
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Sessions, live delivery, and wallet settlement now use the local
-            product APIs.
+            Sessions, live delivery, and wallet settlement share one durable
+            product boundary.
           </p>
         </div>
         <Button asChild>
@@ -111,10 +111,10 @@ export default async function DashboardPage() {
           <div>
             <CardTitle>Sessions</CardTitle>
             <CardDescription>
-              Draft, active, and completed rooms in this local process.
+              Draft, active, and completed rooms in this workspace.
             </CardDescription>
           </div>
-          <Badge variant="secondary">Local adapter</Badge>
+          <Badge variant="secondary">Workspace data</Badge>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {workspace.sessions.length > 0 ? (

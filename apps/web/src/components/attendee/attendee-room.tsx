@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import type { Realtime } from "ably"
 import {
   Captions,
   Headphones,
@@ -63,10 +64,31 @@ const speechLocales: Record<SupportedLanguage, string> = {
   Telugu: "te-IN",
 }
 
-export function AttendeeRoom({ joinCode }: { joinCode: string }) {
+function isCaptionSegment(value: unknown): value is CaptionSegment {
+  if (!value || typeof value !== "object") return false
+  const segment = value as Partial<CaptionSegment>
+  return (
+    typeof segment.id === "string" &&
+    typeof segment.sequence === "number" &&
+    typeof segment.sourceText === "string" &&
+    Boolean(segment.translations) &&
+    typeof segment.translations === "object"
+  )
+}
+
+export function AttendeeRoom({
+  joinCode,
+  managedProviders,
+}: {
+  joinCode: string
+  managedProviders: boolean
+}) {
   const [session, setSession] = useState<PublicSession | null>(null)
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null)
   const [joined, setJoined] = useState(false)
+  const [attendeeCsrfToken, setAttendeeCsrfToken] = useState("")
+  const [providerSessionId, setProviderSessionId] = useState("")
+  const [realtimeConnected, setRealtimeConnected] = useState(false)
   const [selectedLanguage, setSelectedLanguage] =
     useState<SupportedLanguage | null>(null)
   const [showSource, setShowSource] = useState(true)
@@ -74,6 +96,8 @@ export function AttendeeRoom({ joinCode }: { joinCode: string }) {
   const [fontSize, setFontSize] = useState<"normal" | "large" | "xl">("large")
   const [error, setError] = useState("")
   const spokenSequence = useRef(0)
+  const managedAudio = useRef<HTMLAudioElement | null>(null)
+  const realtimeClient = useRef<Realtime | null>(null)
 
   useEffect(() => {
     void fetch(`/api/join/${joinCode}`, { cache: "no-store" })
@@ -112,7 +136,7 @@ export function AttendeeRoom({ joinCode }: { joinCode: string }) {
   }, [joinCode])
 
   useEffect(() => {
-    if (!joined) return
+    if (!joined || snapshot?.status === "completed") return
     const initialLoad = window.setTimeout(() => {
       void loadSnapshot().catch((loadError: unknown) =>
         setError(
@@ -124,12 +148,122 @@ export function AttendeeRoom({ joinCode }: { joinCode: string }) {
       void loadSnapshot().catch(() => {
         setError("Reconnecting to the caption stream…")
       })
-    }, 1200)
+    }, realtimeConnected ? 15_000 : 1_200)
     return () => {
       window.clearTimeout(initialLoad)
       window.clearInterval(interval)
     }
-  }, [joined, loadSnapshot])
+  }, [joined, loadSnapshot, realtimeConnected, snapshot?.status])
+
+  useEffect(() => {
+    if (
+      !managedProviders ||
+      !joined ||
+      !attendeeCsrfToken ||
+      !providerSessionId ||
+      snapshot?.status === "completed"
+    ) {
+      return
+    }
+    let disposed = false
+    let client: Realtime | null = null
+    const channelName = `session:${providerSessionId}`
+
+    void (async () => {
+      await loadSnapshot().catch(() => undefined)
+      const Ably = await import("ably")
+      if (disposed) return
+      client = new Ably.Realtime({
+        authCallback: (_tokenParams, callback) => {
+          void fetch(`/api/providers/sessions/${providerSessionId}/token`, {
+            method: "POST",
+            headers: {
+              "x-csrf-token": attendeeCsrfToken,
+            },
+            cache: "no-store",
+          })
+            .then(async (response) => {
+              const body = (await response.json().catch(() => null)) as {
+                realtime?: { tokenRequest?: Parameters<typeof callback>[1] }
+                error?: string
+              } | null
+              if (!response.ok || !body?.realtime?.tokenRequest) {
+                throw new Error(
+                  body?.error ?? "Realtime authorization failed.",
+                )
+              }
+              callback(null, body.realtime.tokenRequest)
+            })
+            .catch((authError: unknown) => {
+              callback(
+                authError instanceof Error
+                  ? authError.message
+                  : "Realtime authorization failed.",
+                null,
+              )
+            })
+        },
+      })
+      realtimeClient.current = client
+      client.connection.on("connected", () => {
+        setRealtimeConnected(true)
+        setError("")
+      })
+      client.connection.on("disconnected", () => {
+        setRealtimeConnected(false)
+        setError("Reconnecting to the caption stream…")
+      })
+      client.connection.on("suspended", () => {
+        setRealtimeConnected(false)
+        setError("Realtime captions are delayed; polling is still active.")
+      })
+      client.connection.on("failed", () => {
+        setRealtimeConnected(false)
+        setError("Realtime captions are unavailable; polling is still active.")
+      })
+      const channel = client.channels.get(channelName)
+      await channel.subscribe((message) => {
+        if (!isCaptionSegment(message.data)) return
+        const incoming = message.data
+        setSnapshot((current) => {
+          if (!current) return current
+          const existingIndex = current.segments.findIndex(
+            (segment) => segment.id === incoming.id,
+          )
+          const segments =
+            existingIndex === -1
+              ? [...current.segments, incoming]
+              : current.segments.map((segment, index) =>
+                  index === existingIndex ? incoming : segment,
+                )
+          return {
+            ...current,
+            segments: segments.sort(
+              (left, right) => left.sequence - right.sequence,
+            ),
+          }
+        })
+      })
+    })().catch(() => {
+      setRealtimeConnected(false)
+      setError("Realtime captions are unavailable; polling is still active.")
+    })
+
+    return () => {
+      disposed = true
+      setRealtimeConnected(false)
+      client?.channels.get(channelName).unsubscribe()
+      client?.close()
+      if (realtimeClient.current === client) realtimeClient.current = null
+    }
+  }, [
+    attendeeCsrfToken,
+    joined,
+    loadSnapshot,
+    managedProviders,
+    providerSessionId,
+    snapshot?.status,
+  ])
 
   useEffect(() => {
     if (!audioEnabled || !selectedLanguage || !snapshot) return
@@ -137,6 +271,19 @@ export function AttendeeRoom({ joinCode }: { joinCode: string }) {
     if (!latest || latest.sequence <= spokenSequence.current) return
     const text = latest.translations[selectedLanguage]
     if (!text) return
+    const audioReference = latest.audioReferences?.[selectedLanguage]
+    if (audioReference) {
+      managedAudio.current?.pause()
+      const audio = new Audio(audioReference)
+      managedAudio.current = audio
+      void audio.play().catch(() => {
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = speechLocales[selectedLanguage]
+        window.speechSynthesis.speak(utterance)
+      })
+      spokenSequence.current = latest.sequence
+      return
+    }
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = speechLocales[selectedLanguage]
@@ -152,16 +299,25 @@ export function AttendeeRoom({ joinCode }: { joinCode: string }) {
     })
     const body = (await response.json().catch(() => null)) as {
       error?: string
+      csrfToken?: string
+      sessionId?: string
     } | null
     if (!response.ok) {
       setError(body?.error ?? "The room is not accepting attendees.")
       return
     }
+    if (!body?.csrfToken || !body.sessionId) {
+      setError("The attendee session was created without its security scope.")
+      return
+    }
+    setAttendeeCsrfToken(body.csrfToken)
+    setProviderSessionId(body.sessionId)
     setJoined(true)
   }
 
   function toggleAudio() {
     if (audioEnabled) {
+      managedAudio.current?.pause()
       window.speechSynthesis.cancel()
       setAudioEnabled(false)
       return
@@ -211,8 +367,7 @@ export function AttendeeRoom({ joinCode }: { joinCode: string }) {
             <AlertTitle>Privacy notice</AlertTitle>
             <AlertDescription>
               Joining shares an anonymous attendee count with the organizer.
-              This local prototype does not collect your name, email, or device
-              identifier.
+              Prastuti does not ask for your name or email to join this room.
             </AlertDescription>
           </Alert>
           <Button className="w-full" onClick={() => void joinSession()}>
@@ -235,6 +390,11 @@ export function AttendeeRoom({ joinCode }: { joinCode: string }) {
             >
               {snapshot?.status ?? "connecting"}
             </Badge>
+            {managedProviders && (
+              <Badge variant={realtimeConnected ? "outline" : "secondary"}>
+                {realtimeConnected ? "Realtime" : "Reconnecting"}
+              </Badge>
+            )}
             <span className="text-sm text-muted-foreground">
               Code {session.joinCode}
             </span>

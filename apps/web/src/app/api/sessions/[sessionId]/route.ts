@@ -1,15 +1,26 @@
 import { z } from "zod"
+import { start } from "workflow/api"
 
+import { recordAuditEvent } from "@/lib/server/audit"
 import {
   sessionById,
   transitionSession,
   updateSessionContext,
-} from "@/lib/server/product-store"
+} from "@/lib/server/product-repository"
 import {
   authorizeOrganizerMutation,
   currentOrganizerSession,
   noStoreHeaders,
 } from "@/lib/server/request-security"
+import {
+  checkRateLimit,
+  rateLimitResponse,
+} from "@/lib/server/rate-limit"
+import {
+  markSessionFinalizationStarted,
+  queueSessionFinalization,
+} from "@/lib/server/post-session"
+import { finalizeSessionWorkflow } from "@/workflows/session-finalization"
 
 type RouteContext = {
   params: Promise<{ sessionId: string }>
@@ -43,7 +54,7 @@ export async function GET(_request: Request, context: RouteContext) {
     )
   }
   const { sessionId } = await context.params
-  const session = sessionById(sessionId)
+  const session = await sessionById(sessionId)
   if (!session || session.organizationId !== organizer.identity.organizationId) {
     return Response.json(
       { error: "Session not found." },
@@ -61,6 +72,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       { status: 403, headers: noStoreHeaders() },
     )
   }
+  const rateLimit = await checkRateLimit(request, "session-update", {
+    identifier: `session-update:${organizer.identity.id}`,
+    limit: 120,
+    windowSeconds: 60,
+  })
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit)
   const input = updateSchema.safeParse(await request.json().catch(() => null))
   if (!input.success) {
     return Response.json(
@@ -69,7 +86,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     )
   }
   const { sessionId } = await context.params
-  const session = sessionById(sessionId)
+  const session = await sessionById(sessionId)
   if (!session || session.organizationId !== organizer.identity.organizationId) {
     return Response.json(
       { error: "Session not found." },
@@ -79,14 +96,25 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   try {
     if (input.data.operation === "transition") {
-      transitionSession(session, input.data.action)
+      await transitionSession(session, input.data.action)
     } else {
-      updateSessionContext(session, {
+      await updateSessionContext(session, {
         glossary: input.data.glossary,
         notes: input.data.notes,
       })
     }
   } catch (error) {
+    await recordAuditEvent({
+      request,
+      identity: organizer.identity,
+      action:
+        input.data.operation === "transition"
+          ? `session.${input.data.action}`
+          : "session.context_updated",
+      targetType: "session",
+      targetId: session.id,
+      outcome: "failed",
+    })
     return Response.json(
       {
         error:
@@ -95,5 +123,49 @@ export async function PATCH(request: Request, context: RouteContext) {
       { status: 409, headers: noStoreHeaders() },
     )
   }
-  return Response.json({ session }, { headers: noStoreHeaders() })
+  await recordAuditEvent({
+    request,
+    identity: organizer.identity,
+    action:
+      input.data.operation === "transition"
+        ? `session.${input.data.action}`
+        : "session.context_updated",
+    targetType: "session",
+    targetId: session.id,
+    outcome: "succeeded",
+  })
+  let workflowRunId: string | null = null
+  let finalizationStatus: "started" | "pending" | null = null
+  if (
+    input.data.operation === "transition" &&
+    input.data.action === "stop"
+  ) {
+    await queueSessionFinalization(session.id).catch(() => undefined)
+    try {
+      const run = await start(finalizeSessionWorkflow, [session.id])
+      workflowRunId = run.runId
+      finalizationStatus = "started"
+      await markSessionFinalizationStarted(session.id, run.runId).catch(
+        () => undefined,
+      )
+    } catch {
+      finalizationStatus = "pending"
+      await recordAuditEvent({
+        request,
+        identity: organizer.identity,
+        action: "session.finalization_enqueued",
+        targetType: "session",
+        targetId: session.id,
+        outcome: "failed",
+      })
+    }
+  }
+  return Response.json(
+    {
+      session: await sessionById(session.id),
+      workflowRunId,
+      finalizationStatus,
+    },
+    { headers: noStoreHeaders() },
+  )
 }

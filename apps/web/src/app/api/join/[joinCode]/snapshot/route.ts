@@ -1,7 +1,7 @@
 import {
   buildSessionArtifacts,
   sessionById,
-} from "@/lib/server/product-store"
+} from "@/lib/server/product-repository"
 import {
   currentAttendeeSession,
   noStoreHeaders,
@@ -20,7 +20,7 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 401, headers: noStoreHeaders() },
     )
   }
-  const session = sessionById(attendee.sessionId)
+  const session = await sessionById(attendee.sessionId)
   if (!session) {
     return Response.json(
       { error: "This session is no longer available." },
@@ -34,7 +34,15 @@ export async function GET(_request: Request, context: RouteContext) {
         status: session.status,
         sourceLanguage: session.sourceLanguage,
         targetLanguages: session.targetLanguages,
-        segments: session.segments,
+        segments: session.segments.map((segment) => ({
+          ...segment,
+          audioReferences: Object.fromEntries(
+            Object.keys(segment.audioReferences ?? {}).map((language) => [
+              language,
+              `/api/join/${session.joinCode}/audio/${segment.id}/${language}`,
+            ]),
+          ),
+        })),
         endedAt: session.endedAt,
         artifacts:
           session.status === "completed"

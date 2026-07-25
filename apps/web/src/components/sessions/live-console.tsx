@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import type { SpeechRecognizer } from "microsoft-cognitiveservices-speech-sdk"
 import QRCode from "qrcode"
 import {
   Captions,
@@ -72,7 +73,21 @@ const languageLocales = {
   Telugu: "te-IN",
 } as const
 
-export function LiveConsole({ sessionId }: { sessionId: string }) {
+type ManagedProviderCredentials = {
+  speech: {
+    token: string
+    region: string
+    expiresAt: string
+  } | null
+}
+
+export function LiveConsole({
+  sessionId,
+  managedProviders,
+}: {
+  sessionId: string
+  managedProviders: boolean
+}) {
   const [session, setSession] = useState<ProductSession | null>(null)
   const [error, setError] = useState("")
   const [pending, setPending] = useState(false)
@@ -89,6 +104,8 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
   const audioContext = useRef<AudioContext | null>(null)
   const animationFrame = useRef<number | null>(null)
   const recognition = useRef<SpeechRecognitionLike | null>(null)
+  const managedRecognition = useRef<SpeechRecognizer | null>(null)
+  const managedTokenRefresh = useRef<number | null>(null)
 
   const loadSession = useCallback(async () => {
     try {
@@ -106,13 +123,14 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
   }, [sessionId])
 
   useEffect(() => {
+    if (session?.status === "completed") return
     const initialLoad = window.setTimeout(() => void loadSession(), 0)
     const interval = window.setInterval(() => void loadSession(), 1500)
     return () => {
       window.clearTimeout(initialLoad)
       window.clearInterval(interval)
     }
-  }, [loadSession])
+  }, [loadSession, session?.status])
 
   useEffect(() => {
     if (!session?.joinCode) return
@@ -130,6 +148,12 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
   useEffect(
     () => () => {
       recognition.current?.stop()
+      if (managedTokenRefresh.current) {
+        window.clearTimeout(managedTokenRefresh.current)
+      }
+      managedRecognition.current?.stopContinuousRecognitionAsync(() =>
+        managedRecognition.current?.close(),
+      )
       mediaStream.current?.getTracks().forEach((track) => track.stop())
       if (animationFrame.current) {
         cancelAnimationFrame(animationFrame.current)
@@ -138,6 +162,17 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
     },
     [],
   )
+
+  function stopMicrophoneMeter() {
+    mediaStream.current?.getTracks().forEach((track) => track.stop())
+    mediaStream.current = null
+    if (animationFrame.current) {
+      cancelAnimationFrame(animationFrame.current)
+      animationFrame.current = null
+    }
+    void audioContext.current?.close()
+    audioContext.current = null
+  }
 
   async function checkMicrophone() {
     setMicrophoneState("checking")
@@ -190,8 +225,7 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
       )
       setSession(response.session)
       if (action === "stop") {
-        recognition.current?.stop()
-        setBrowserSpeechActive(false)
+        stopSpeech()
       }
     } catch (transitionError) {
       setError(
@@ -298,6 +332,128 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
     setBrowserSpeechActive(false)
   }
 
+  async function managedProviderCredentials() {
+    return organizerApi<ManagedProviderCredentials>(
+      `/api/providers/sessions/${sessionId}/token`,
+      { method: "POST" },
+    )
+  }
+
+  async function refreshManagedSpeechToken() {
+    try {
+      const credentials = await managedProviderCredentials()
+      if (!credentials.speech || !managedRecognition.current) return
+      managedRecognition.current.authorizationToken = credentials.speech.token
+      scheduleManagedTokenRefresh()
+    } catch {
+      managedTokenRefresh.current = window.setTimeout(
+        () => void refreshManagedSpeechToken(),
+        30_000,
+      )
+    }
+  }
+
+  function scheduleManagedTokenRefresh() {
+    if (managedTokenRefresh.current) {
+      window.clearTimeout(managedTokenRefresh.current)
+    }
+    managedTokenRefresh.current = window.setTimeout(
+      () => void refreshManagedSpeechToken(),
+      7 * 60 * 1000,
+    )
+  }
+
+  async function startManagedSpeech() {
+    if (!session) return
+    setError("")
+    try {
+      const credentials = await managedProviderCredentials()
+      if (!credentials.speech) {
+        throw new Error("Managed speech credentials were not issued.")
+      }
+      stopMicrophoneMeter()
+      const SpeechSdk = await import("microsoft-cognitiveservices-speech-sdk")
+      const speechConfig = SpeechSdk.SpeechConfig.fromAuthorizationToken(
+        credentials.speech.token,
+        credentials.speech.region,
+      )
+      speechConfig.speechRecognitionLanguage =
+        languageLocales[session.sourceLanguage]
+      const audioConfig = SpeechSdk.AudioConfig.fromDefaultMicrophoneInput()
+      const recognizer = new SpeechSdk.SpeechRecognizer(
+        speechConfig,
+        audioConfig,
+      )
+      recognizer.recognized = (_sender, event) => {
+        if (
+          event.result.reason === SpeechSdk.ResultReason.RecognizedSpeech &&
+          event.result.text.trim()
+        ) {
+          void publishCaption(event.result.text.trim())
+        }
+      }
+      recognizer.canceled = (_sender, event) => {
+        setError(
+          event.errorDetails
+            ? `Managed speech stopped: ${event.errorDetails}`
+            : "Managed speech recognition stopped unexpectedly.",
+        )
+        stopManagedSpeech()
+      }
+      recognizer.sessionStopped = () => {
+        setBrowserSpeechActive(false)
+      }
+      managedRecognition.current = recognizer
+      await new Promise<void>((resolveStart, rejectStart) => {
+        recognizer.startContinuousRecognitionAsync(
+          resolveStart,
+          (message) => rejectStart(new Error(message)),
+        )
+      })
+      scheduleManagedTokenRefresh()
+      setBrowserSpeechActive(true)
+    } catch (speechError) {
+      stopManagedSpeech()
+      setError(
+        speechError instanceof Error
+          ? speechError.message
+          : "Managed speech recognition could not start.",
+      )
+    }
+  }
+
+  function stopManagedSpeech() {
+    if (managedTokenRefresh.current) {
+      window.clearTimeout(managedTokenRefresh.current)
+      managedTokenRefresh.current = null
+    }
+    const recognizer = managedRecognition.current
+    managedRecognition.current = null
+    if (recognizer) {
+      recognizer.stopContinuousRecognitionAsync(
+        () => recognizer.close(),
+        () => recognizer.close(),
+      )
+    }
+    setBrowserSpeechActive(false)
+  }
+
+  function startSpeech() {
+    if (managedProviders) {
+      void startManagedSpeech()
+    } else {
+      startBrowserSpeech()
+    }
+  }
+
+  function stopSpeech() {
+    if (managedProviders) {
+      stopManagedSpeech()
+    } else {
+      stopBrowserSpeech()
+    }
+  }
+
   if (!session) {
     return (
       <Card>
@@ -333,8 +489,9 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
               </div>
               <CardTitle>{session.name}</CardTitle>
               <CardDescription>
-                Local mode sends captions through authenticated serverless-style
-                HTTP APIs. No always-on socket server is required.
+                {managedProviders
+                  ? "Managed speech and scoped realtime channels deliver captions without a Prastuti-owned socket server."
+                  : "Local mode sends captions through authenticated serverless-style HTTP APIs. No always-on socket server is required."}
               </CardDescription>
             </div>
             <div className="flex flex-wrap justify-end gap-2">
@@ -436,8 +593,9 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
               Presenter input
             </CardTitle>
             <CardDescription>
-              Check the microphone, then use browser recognition, manual text,
-              or deterministic segments for local acceptance testing.
+              {managedProviders
+                ? "Use managed speech recognition, or publish manual text when the room is noisy."
+                : "Check the microphone, then use browser recognition, manual text, or deterministic segments for local acceptance testing."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -460,13 +618,13 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
               </Button>
               {session.status === "live" &&
                 (browserSpeechActive ? (
-                  <Button variant="outline" onClick={stopBrowserSpeech}>
-                    Stop browser captions
+                  <Button variant="outline" onClick={stopSpeech}>
+                    Stop {managedProviders ? "managed" : "browser"} captions
                   </Button>
                 ) : (
-                  <Button variant="outline" onClick={startBrowserSpeech}>
+                  <Button variant="outline" onClick={startSpeech}>
                     <Captions className="size-4" aria-hidden="true" />
-                    Use browser captions
+                    Use {managedProviders ? "managed" : "browser"} captions
                   </Button>
                 ))}
               <Button
@@ -508,7 +666,9 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
               Live transcript
             </CardTitle>
             <CardDescription>
-              Attendee views poll this same canonical transcript.
+              {managedProviders
+                ? "Attendees receive this canonical transcript over scoped realtime channels."
+                : "Attendee views poll this same canonical transcript."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -612,8 +772,9 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
           <CardHeader>
             <CardTitle>Language channels</CardTitle>
             <CardDescription>
-              Captions are shared; audio is synthesized in each attendee browser
-              after a user gesture.
+              {managedProviders
+                ? "Captions and shared audio are delivered once per language through managed providers."
+                : "Captions are shared; audio is synthesized in each attendee browser after a user gesture."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -625,7 +786,7 @@ export function LiveConsole({ sessionId }: { sessionId: string }) {
                 <div>
                   <p className="font-medium">{language}</p>
                   <p className="text-sm text-muted-foreground">
-                    caption + local audio
+                    caption + {managedProviders ? "shared audio" : "local audio"}
                   </p>
                 </div>
                 <span className="font-mono text-sm text-muted-foreground">

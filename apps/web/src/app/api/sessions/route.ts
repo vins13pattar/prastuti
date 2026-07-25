@@ -1,15 +1,20 @@
 import { z } from "zod"
 
 import { supportedLanguages } from "@/lib/product/types"
+import { recordAuditEvent } from "@/lib/server/audit"
 import {
   createProductSession,
   workspaceSnapshot,
-} from "@/lib/server/product-store"
+} from "@/lib/server/product-repository"
 import {
   authorizeOrganizerMutation,
   currentOrganizerSession,
   noStoreHeaders,
 } from "@/lib/server/request-security"
+import {
+  checkRateLimit,
+  rateLimitResponse,
+} from "@/lib/server/rate-limit"
 
 const createSessionSchema = z
   .object({
@@ -36,7 +41,7 @@ export async function GET() {
       { status: 401, headers: noStoreHeaders() },
     )
   }
-  const snapshot = workspaceSnapshot(organizer.identity)
+  const snapshot = await workspaceSnapshot(organizer.identity)
   return Response.json(
     { sessions: snapshot.sessions },
     { headers: noStoreHeaders() },
@@ -51,6 +56,12 @@ export async function POST(request: Request) {
       { status: 403, headers: noStoreHeaders() },
     )
   }
+  const rateLimit = await checkRateLimit(request, "session-create", {
+    identifier: `session-create:${organizer.identity.id}`,
+    limit: 30,
+    windowSeconds: 60,
+  })
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit)
   const input = createSessionSchema.safeParse(
     await request.json().catch(() => null),
   )
@@ -60,6 +71,14 @@ export async function POST(request: Request) {
       { status: 400, headers: noStoreHeaders() },
     )
   }
-  const session = createProductSession(input.data)
+  const session = await createProductSession(input.data, organizer.identity)
+  await recordAuditEvent({
+    request,
+    identity: organizer.identity,
+    action: "session.created",
+    targetType: "session",
+    targetId: session.id,
+    outcome: "succeeded",
+  })
   return Response.json({ session }, { status: 201, headers: noStoreHeaders() })
 }

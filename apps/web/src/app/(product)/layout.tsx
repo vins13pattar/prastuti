@@ -8,7 +8,11 @@ export default async function ProductLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const session = await currentOrganizerSession()
-  if (!session) redirect("/local-sign-in")
+  if (!session) {
+    redirect(
+      productRuntime().mode === "mock" ? "/local-sign-in" : "/sign-in",
+    )
+  }
 
   return (
     <AppShell

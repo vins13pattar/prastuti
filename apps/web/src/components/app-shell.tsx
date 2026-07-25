@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { UserButton } from "@clerk/nextjs"
 import {
   AudioLines,
   CirclePlus,
@@ -120,6 +121,7 @@ export function AppShell({
               </div>
               <div className="flex items-center gap-2">
                 <ThemeToggle />
+                {!localMode ? <UserButton /> : null}
                 <Button asChild size="sm">
                   <Link href="/sessions/new">Create session</Link>
                 </Button>

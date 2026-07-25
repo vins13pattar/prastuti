@@ -8,9 +8,12 @@ export const supportedLanguages = [
 export type SupportedLanguage = (typeof supportedLanguages)[number]
 export type SessionStatus =
   | "draft"
+  | "ready"
   | "live"
   | "paused"
+  | "settling"
   | "completed"
+  | "failed"
 
 export type CaptionTranslations = Partial<
   Record<SupportedLanguage, string>
@@ -21,6 +24,7 @@ export type CaptionSegment = {
   sequence: number
   sourceText: string
   translations: CaptionTranslations
+  audioReferences?: Partial<Record<SupportedLanguage, string>>
   createdAt: string
   correctedAt?: string
 }
@@ -60,7 +64,15 @@ export type OrganizerIdentity = {
 
 export type CreditLedgerItem = {
   id: string
-  type: "load" | "reserve" | "consume" | "release"
+  type:
+    | "load"
+    | "reserve"
+    | "consume"
+    | "release"
+    | "expire"
+    | "refund"
+    | "chargeback"
+    | "adjustment"
   credits: number
   sessionId?: string
   createdAt: string
