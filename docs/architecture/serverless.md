@@ -14,9 +14,9 @@ flowchart LR
     attendee["Attendee browser"] --> token
     token --> db["Neon Postgres"]
     token --> ephemeral["Upstash Redis"]
-    presenter --> media["Managed WebRTC and realtime provider"]
+    presenter --> media["Ably realtime"]
     attendee --> media
-    presenter --> speech["Managed speech providers"]
+    presenter --> speech["Azure Speech and Translator"]
     speech --> segment["Stateless segment functions"]
     segment --> media
     segment --> db
@@ -36,18 +36,20 @@ flowchart LR
 | ORM and migrations | Drizzle ORM and Drizzle Kit | Build-time tooling only; no runtime daemon |
 | Ephemeral coordination | Upstash Redis over REST | Request-based service with no managed server |
 | Assets | Vercel Blob | Object storage without application compute |
-| Live transport | Managed WebRTC and realtime pub-sub | Provider carries persistent connections |
-| Speech | Managed STT, translation, and TTS APIs | Provider capacity is consumed only during sessions |
-| Payments | Razorpay or Cashfree through typed adapters | Webhooks invoke stateless functions |
-| Post-session processing | Vercel Workflow, subject to beta exit criteria | Durable steps run only when work exists |
+| Live transport | Ably scoped pub-sub | Provider carries persistent connections |
+| Speech | Azure Speech and Translator | Provider capacity is consumed only during sessions |
+| Payments | Razorpay | Webhooks invoke stateless functions |
+| Upload scanning | Cloudmersive | Scan requests run only for accepted uploads |
+| Post-session processing | Vercel Workflow | Durable steps run only when work exists |
 | Observability | OpenTelemetry-compatible managed backend | Usage and retention based |
 
 ## Live-session execution
 
 1. A Vercel Function authenticates the organizer, checks the wallet, reserves credits, and issues short-lived provider tokens.
 2. The presenter browser sends media directly to the selected managed speech or WebRTC provider. Provider secrets never enter the browser.
-3. Finalized speech segments invoke stateless TypeScript translation and settlement functions.
-4. Translated captions and audio references are published through the managed realtime provider, not held in a Prastuti WebSocket process.
+3. Finalized speech segments invoke stateless TypeScript translation and metering functions.
+4. Translated captions and authorized private-audio references are published
+   through Ably, not held in a Prastuti WebSocket process.
 5. Attendees subscribe directly with event-scoped, short-lived tokens.
 6. Session completion starts a durable workflow for reconciliation, summaries, transcripts, and retention.
 
@@ -75,13 +77,16 @@ flowchart LR
 - Development defaults to deterministic mock adapters and requires no external infrastructure.
 - An optional Docker Compose profile provides PostgreSQL and Valkey for persistence and coordination integration.
 - The application selects `postgres-js` only for the local PostgreSQL profile; production remains on the Neon HTTP driver.
-- Mock payment behavior is disabled whenever managed runtime mode is selected.
+- Mock payment and provider behavior is disabled whenever managed runtime mode is selected.
 - Local product verification does not claim real speech quality, media fan-out, payment settlement, or provider latency.
 - Provider acceptance tests remain mandatory before a managed adapter is promoted to production.
 
-## Provider decisions still required
+## Release decisions still required
 
-- Benchmark LiveKit Cloud, Ably, and equivalent managed transport options for India latency, fan-out cost, and data residency.
-- Benchmark Azure Speech, BHASHINI, and Google Cloud for supported language directions and token brokerage.
-- Approve payment provider, GST invoicing, refunds, chargebacks, and credit-expiry disclosure.
-- Reassess Vercel Workflow when it exits public beta or before using it for financial settlement.
+- Validate Azure and Ably latency, fan-out cost, language quality, and data
+  residency with production accounts and representative India traffic.
+- Approve public credit pricing, GST invoicing, refunds, chargebacks, and
+  credit-expiry disclosure.
+- Keep all financial reservation and settlement in Postgres; Workflow may
+  generate artifacts and enforce retention but is not the financial system of
+  record.

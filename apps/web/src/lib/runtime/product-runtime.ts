@@ -4,6 +4,13 @@ export type ProductRuntimeMode = (typeof PRODUCT_RUNTIME_MODES)[number]
 
 const managedIntegrations = [
   {
+    name: "identity",
+    environment: [
+      "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+      "CLERK_SECRET_KEY",
+    ],
+  },
+  {
     name: "database",
     environment: ["DATABASE_URL"],
   },
@@ -19,23 +26,31 @@ const managedIntegrations = [
     environment: ["BLOB_READ_WRITE_TOKEN"],
   },
   {
+    name: "malware-scanning",
+    environment: ["CLOUDMERSIVE_VIRUS_API_KEY"],
+  },
+  {
     name: "realtime",
-    environment: [
-      "REALTIME_PROVIDER_URL",
-      "REALTIME_PROVIDER_API_KEY",
-      "REALTIME_PROVIDER_API_SECRET",
-    ],
+    environment: ["ABLY_API_KEY"],
   },
   {
     name: "speech",
     environment: [
-      "SPEECH_PROVIDER_ENDPOINT",
-      "SPEECH_PROVIDER_API_KEY",
+      "AZURE_SPEECH_REGION",
+      "AZURE_SPEECH_API_KEY",
+      "AZURE_TRANSLATOR_ENDPOINT",
+      "AZURE_TRANSLATOR_REGION",
+      "AZURE_TRANSLATOR_API_KEY",
     ],
   },
   {
     name: "payments",
-    environment: ["PAYMENT_WEBHOOK_SECRET"],
+    environment: [
+      "NEXT_PUBLIC_RAZORPAY_KEY_ID",
+      "RAZORPAY_KEY_SECRET",
+      "PAYMENT_WEBHOOK_SECRET",
+      "CREDIT_PRICE_PAISE",
+    ],
   },
 ] as const
 

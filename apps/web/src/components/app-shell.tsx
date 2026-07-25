@@ -2,12 +2,12 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { UserButton } from "@clerk/nextjs"
 import {
   AudioLines,
   CirclePlus,
   Gauge,
   Menu,
-  Radio,
   WalletCards,
 } from "lucide-react"
 
@@ -27,7 +27,6 @@ import { cn } from "@/lib/utils"
 const navigation = [
   { href: "/dashboard", label: "Overview", icon: Gauge },
   { href: "/sessions/new", label: "New session", icon: CirclePlus },
-  { href: "/sessions/live", label: "Live console", icon: Radio },
   { href: "/credits", label: "Credits", icon: WalletCards },
 ]
 
@@ -61,7 +60,15 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
   )
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  workspaceName,
+  localMode,
+}: {
+  children: React.ReactNode
+  workspaceName: string
+  localMode: boolean
+}) {
   return (
     <TooltipProvider>
       <div className="min-h-[100dvh] bg-muted/30">
@@ -73,10 +80,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="absolute inset-x-5 bottom-5 rounded-xl border border-border bg-muted/45 p-4">
             <div className="flex items-center gap-2 text-sm font-medium">
               <AudioLines className="size-4 text-primary" aria-hidden="true" />
-              Demo workspace
+              {localMode ? "Local workspace" : "Managed workspace"}
             </div>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Product flows use sample data. No payment or speech provider is connected.
+              {localMode
+                ? "Infra-free mode uses deterministic speech and payment adapters."
+                : "Production adapters are selected from environment configuration."}
             </p>
           </div>
         </aside>
@@ -107,11 +116,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </SheetContent>
                 </Sheet>
                 <p className="hidden text-sm text-muted-foreground sm:block">
-                  MicroDegree
+                  {workspaceName}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <ThemeToggle />
+                {!localMode ? <UserButton /> : null}
                 <Button asChild size="sm">
                   <Link href="/sessions/new">Create session</Link>
                 </Button>

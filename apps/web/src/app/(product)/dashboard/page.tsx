@@ -1,5 +1,10 @@
 import Link from "next/link"
-import { ArrowRight, CalendarClock, Radio, WalletCards } from "lucide-react"
+import {
+  ArrowRight,
+  CalendarClock,
+  Radio,
+  WalletCards,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,14 +24,24 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatCredits } from "@/lib/credits"
-import { demoCreditLots, recentSessions, usageByMeter } from "@/lib/sample-data"
+import { workspaceSnapshot } from "@/lib/server/product-repository"
+import { currentOrganizerSession } from "@/lib/server/request-security"
 
-export default function DashboardPage() {
-  const balance = demoCreditLots.reduce(
-    (total, lot) => total + lot.remainingCredits,
+export const dynamic = "force-dynamic"
+
+export default async function DashboardPage() {
+  const organizer = await currentOrganizerSession()
+  if (!organizer) return null
+  const workspace = await workspaceSnapshot(organizer.identity)
+  const used = workspace.sessions.reduce(
+    (total, session) => total + session.consumedCredits,
     0,
   )
-  const used = usageByMeter.reduce((total, meter) => total + meter.credits, 0)
+  const expiry = workspace.wallet.expiresAt
+    ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(
+        new Date(workspace.wallet.expiresAt),
+      )
+    : "No active credits"
 
   return (
     <div className="mx-auto max-w-7xl space-y-7">
@@ -34,10 +49,11 @@ export default function DashboardPage() {
         <div>
           <p className="text-sm font-medium text-primary">Overview</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Good afternoon, Vinod.
+            {workspace.identity.workspaceName}
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Your demo workspace is ready for the next multilingual session.
+            Sessions, live delivery, and wallet settlement share one durable
+            product boundary.
           </p>
         </div>
         <Button asChild>
@@ -52,20 +68,20 @@ export default function DashboardPage() {
         {[
           {
             label: "Available balance",
-            value: formatCredits(balance),
-            detail: "credits across 2 active lots",
+            value: formatCredits(workspace.wallet.availableCredits),
+            detail: `${formatCredits(workspace.wallet.reservedCredits)} credits reserved`,
             icon: WalletCards,
           },
           {
-            label: "Usage this month",
+            label: "Settled usage",
             value: formatCredits(used),
-            detail: "credits from 3 completed sessions",
+            detail: `${workspace.sessions.filter((session) => session.status === "completed").length} completed sessions`,
             icon: Radio,
           },
           {
             label: "Next expiry",
-            value: "12 Apr 2027",
-            detail: "15,000 credits in the earliest lot",
+            value: expiry,
+            detail: "Credits expire 365 days after loading",
             icon: CalendarClock,
           },
         ].map((stat) => (
@@ -74,10 +90,12 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="mt-3 font-mono text-3xl font-semibold tracking-tight">
+                  <p className="mt-3 font-mono text-2xl font-semibold tracking-tight">
                     {stat.value}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">{stat.detail}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {stat.detail}
+                  </p>
                 </div>
                 <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
                   <stat.icon className="size-5" aria-hidden="true" />
@@ -88,72 +106,82 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-        <Card>
-          <CardHeader className="flex-row items-center justify-between gap-4">
-            <div>
-              <CardTitle>Recent sessions</CardTitle>
-              <CardDescription>Settled usage from the demo workspace.</CardDescription>
-            </div>
-            <Badge variant="secondary">Sample data</Badge>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Sessions</CardTitle>
+            <CardDescription>
+              Draft, active, and completed rooms in this workspace.
+            </CardDescription>
+          </div>
+          <Badge variant="secondary">Workspace data</Badge>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {workspace.sessions.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Session</TableHead>
                   <TableHead>Languages</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Attendees</TableHead>
                   <TableHead className="text-right">Credits</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentSessions.map((session) => (
+                {workspace.sessions.map((session) => (
                   <TableRow key={session.id}>
                     <TableCell>
-                      <p className="font-medium">{session.name}</p>
-                      <p className="text-xs text-muted-foreground">{session.date}</p>
+                      <Link
+                        className="font-medium hover:text-primary"
+                        href={`/sessions/${session.id}/live`}
+                      >
+                        {session.name}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">
+                        {new Intl.DateTimeFormat("en-IN", {
+                          dateStyle: "medium",
+                        }).format(new Date(session.createdAt))}
+                      </p>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {session.source} to {session.targets}
+                      {session.sourceLanguage} to{" "}
+                      {session.targetLanguages.join(", ")}
                     </TableCell>
-                    <TableCell>{session.attendees}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          session.status === "live" ? "default" : "secondary"
+                        }
+                      >
+                        {session.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{session.attendeeCount}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCredits(session.credits)}
+                      {formatCredits(
+                        session.consumedCredits || session.reservedCredits,
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Usage by meter</CardTitle>
-            <CardDescription>July 2026 demo consumption.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {usageByMeter.map((item) => (
-              <div key={item.meter}>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium">{item.meter}</p>
-                    <p className="text-xs text-muted-foreground">{item.detail}</p>
-                  </div>
-                  <span className="font-mono text-sm">{formatCredits(item.credits)}</span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${Math.max(12, (item.credits / used) * 100)}%` }}
-                  />
-                </div>
+          ) : (
+            <div className="grid min-h-48 place-items-center rounded-xl border border-dashed text-center">
+              <div>
+                <p className="font-medium">No sessions yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Create a room to exercise the local end-to-end flow.
+                </p>
+                <Button asChild className="mt-4" size="sm">
+                  <Link href="/sessions/new">Create first session</Link>
+                </Button>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
