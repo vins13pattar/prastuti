@@ -24,12 +24,15 @@ This checklist separates repository preparation from the irreversible public-rel
 - [x] Managed integrations fail closed when required configuration is absent
 - [x] Docker-backed persistent smoke and financial-invariant verification
 
-## Required before making the repository public
+## Live repository settings
 
-- [ ] Enable GitHub private vulnerability reporting
-- [ ] Confirm repository description, topics, social preview, and public contact path
-- [ ] Confirm branch protection and required CI checks on `main`
-- [ ] Make the GitHub repository public only after all blockers above are resolved
+- [x] GitHub private vulnerability reporting enabled
+- [x] Repository description, topics, social preview, homepage, and public
+  security contact path confirmed
+- [x] `main` requires strict `web` and `secrets` checks, resolves review
+  conversations, enforces protection for administrators, and rejects force
+  pushes and deletion
+- [x] GitHub repository published on 25 July 2026
 
 ## License decision
 
@@ -59,5 +62,10 @@ The production dependency audit reports one ignored high-severity advisory in
 Workflow's legacy build-only CLI dependency chain. Runtime-facing
 `brace-expansion` is overridden to the patched release; Prastuti does not pass
 request-controlled glob patterns to the affected tooling. Re-evaluate and
-remove the exception when the upstream chain updates. The exact release commit
-and hosted CI result are recorded after the prepared changes are pushed.
+remove the exception when the upstream chain updates.
+
+Implementation commit `601f3d6` passed both hosted checks in
+[CI run 30142431772](https://github.com/vins13pattar/prastuti/actions/runs/30142431772):
+the complete-history secret scan and the web job covering install, unit tests,
+typecheck, lint, dependency audit, production build, migrations, Postgres
+invariants, and both product smoke modes.
