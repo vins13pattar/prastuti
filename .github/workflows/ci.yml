@@ -29,6 +29,20 @@ jobs:
 
   web:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: prastuti
+          POSTGRES_USER: prastuti
+          POSTGRES_PASSWORD: prastuti-local
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U prastuti -d prastuti"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
     defaults:
       run:
         working-directory: apps/web
@@ -64,6 +78,15 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Migrate local PostgreSQL
+        run: pnpm local:db:migrate
+
+      - name: Verify PostgreSQL invariants
+        run: pnpm local:postgres:verify
+
+      - name: Smoke test persistent product mode
+        run: pnpm local:persistent:smoke
 
       - name: Smoke test local product mode
         run: pnpm local:smoke
