@@ -32,6 +32,7 @@ import type {
   WorkspaceSnapshot,
 } from "@/lib/product/types"
 import { productRuntime } from "@/lib/runtime/product-runtime"
+import { recordOperationalEvent } from "@/lib/server/telemetry"
 import {
   publishCaptionToAbly,
   synthesizeSharedAudio,
@@ -526,15 +527,18 @@ export async function appendSegment(
     await publishCaptionToAbly(
       session.id,
       attendeeRealtimeSegment(session, segment),
-    ).catch(() => {
-      console.error(
-        JSON.stringify({
-          level: "error",
-          event: "realtime_publish_failed",
-          sessionId: session.id,
-          segmentId: segment.id,
-        }),
-      )
+    ).catch((error) => {
+      recordOperationalEvent({
+        event: "provider.request_failed",
+        level: "error",
+        outcome: "failed",
+        error,
+        attributes: {
+          provider: "ably",
+          capability: "realtime",
+          operation: "caption.publish",
+        },
+      })
     })
   }
   return segment
@@ -590,15 +594,18 @@ export async function correctSegment(
       session.id,
       attendeeRealtimeSegment(session, segment),
       "caption.corrected",
-    ).catch(() => {
-      console.error(
-        JSON.stringify({
-          level: "error",
-          event: "realtime_publish_failed",
-          sessionId: session.id,
-          segmentId: segment.id,
-        }),
-      )
+    ).catch((error) => {
+      recordOperationalEvent({
+        event: "provider.request_failed",
+        level: "error",
+        outcome: "failed",
+        error,
+        attributes: {
+          provider: "ably",
+          capability: "realtime",
+          operation: "caption.corrected.publish",
+        },
+      })
     })
   }
   return segment

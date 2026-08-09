@@ -4,6 +4,7 @@ import { auditEvents } from "@/db/schema"
 import { getDatabase } from "@/db"
 import type { OrganizerIdentity } from "@/lib/product/types"
 import { usesPostgresRepository } from "@/lib/server/product-repository"
+import { recordOperationalEvent } from "@/lib/server/telemetry"
 
 export type AuditEventInput = {
   request?: Request
@@ -31,26 +32,29 @@ export async function recordAuditEvent(input: AuditEventInput) {
   try {
     if (usesPostgresRepository()) {
       await getDatabase().insert(auditEvents).values(event)
-      return
     }
 
-    console.info(
-      JSON.stringify({
-        level: "info",
-        event: "audit",
-        ...event,
-        timestamp: new Date().toISOString(),
-      }),
-    )
-  } catch {
-    console.error(
-      JSON.stringify({
-        level: "error",
-        event: "audit_write_failed",
+    recordOperationalEvent({
+      event: "audit.recorded",
+      request: input.request,
+      outcome: input.outcome,
+      attributes: {
         action: input.action,
-        requestId,
-        timestamp: new Date().toISOString(),
-      }),
-    )
+        targetType: input.targetType,
+        storage: usesPostgresRepository() ? "postgres" : "structured-log",
+      },
+    })
+  } catch (error) {
+    recordOperationalEvent({
+      event: "audit.write_failed",
+      level: "error",
+      request: input.request,
+      outcome: "failed",
+      error,
+      attributes: {
+        action: input.action,
+        targetType: input.targetType,
+      },
+    })
   }
 }

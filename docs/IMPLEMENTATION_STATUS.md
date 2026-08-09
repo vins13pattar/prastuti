@@ -37,6 +37,9 @@ when its UI, API, state transition, and automated check exist.
 - durable finalization workflow with persisted artifacts, retry API, and
   retention step;
 - durable organizer, attendee, payment, session, and workflow audit records;
+- OpenTelemetry initialization plus request-correlated, redacted operational
+  events for audit writes, rate-limit denial, payment webhooks, and realtime
+  provider failures;
 - Docker-backed persistent smoke and invariant tests covering exact 365-day
   expiry, webhook replay, payment mismatch, concurrent reservation,
   insufficient balance, usage metering, and settlement.
@@ -49,7 +52,9 @@ when its UI, API, state transition, and automated check exist.
   refund policy, and chargeback operations before accepting money;
 - automate or formally staff refund/dispute handling; those webhook events are
   currently persisted for manual review rather than mutating credit balances;
-- connect production telemetry, redaction, alerts, SLOs, and cost guardrails;
+- connect the implemented traces and structured logs to the selected production
+  backend, then configure dashboards, alerts, SLOs, retention, and cost
+  guardrails;
 - run provider-specific load, latency, failure, browser/device, accessibility,
   data-residency, privacy, and security acceptance tests;
 - deployment of the authenticated product application.

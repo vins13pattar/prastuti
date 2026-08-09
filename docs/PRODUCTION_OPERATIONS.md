@@ -17,6 +17,8 @@ Start from `apps/web/.env.example`. Managed mode requires:
 - Azure Speech region/key and Translator endpoint, region, and key;
 - Razorpay public key, secret, webhook secret, and an explicitly approved
   `CREDIT_PRICE_PAISE`.
+- an OpenTelemetry export path: Vercel's collector or an approved
+  `OTEL_EXPORTER_OTLP_ENDPOINT` outside Vercel.
 
 Store secrets in the deployment platform. Never commit them, expose them in
 client bundles, paste them into issues, or log their values.
@@ -54,10 +56,17 @@ client bundles, paste them into issues, or log their values.
 
 ## Monitoring and response
 
-Route structured application logs and persisted audit events to the selected
-observability backend. Alert on unhealthy managed configuration, webhook
-signature or amount failures, repeated workflow failures, reservation
-conflicts, provider error rates, latency, and unexpected spend.
+Prastuti initializes OpenTelemetry as `prastuti-web` and emits redacted JSON
+operational events with request and active trace correlation. Route traces
+through Vercel's collector or an approved OTLP endpoint, and route runtime logs
+through the selected log drain. Persisted audit records remain the durable
+business trail; operational telemetry is not a financial source of truth.
+
+Alert on unhealthy managed configuration, webhook signature or amount
+failures, repeated workflow failures, rate-limiter unavailability, reservation
+conflicts, provider error rates, latency, and unexpected spend. The event
+catalog and redaction contract are documented in
+[observability](OBSERVABILITY.md).
 
 If finalization fails after financial settlement, retry with:
 
