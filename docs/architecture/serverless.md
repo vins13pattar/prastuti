@@ -41,7 +41,7 @@ flowchart LR
 | Payments | Razorpay | Webhooks invoke stateless functions |
 | Upload scanning | Cloudmersive | Scan requests run only for accepted uploads |
 | Post-session processing | Vercel Workflow | Durable steps run only when work exists |
-| Observability | OpenTelemetry-compatible managed backend | Usage and retention based |
+| Observability | `@vercel/otel`, structured runtime logs, and an OpenTelemetry-compatible managed backend | Instrumentation is request-driven; export usage and retention are backend-dependent |
 
 ## Live-session execution
 
@@ -71,6 +71,8 @@ flowchart LR
 - Keep database transactions short and retry serialization or transient connection failures.
 - Do not schedule high-frequency cron requests because they prevent a clean idle period.
 - Put long-running or retryable post-session work in a durable workflow.
+- Keep telemetry request-driven, bounded, and free of credentials, raw provider
+  payloads, caption text, or direct user identifiers.
 
 ## Local development boundary
 

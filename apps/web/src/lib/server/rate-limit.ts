@@ -4,6 +4,7 @@ import { Ratelimit } from "@upstash/ratelimit"
 import { Redis } from "@upstash/redis"
 
 import { productRuntime } from "@/lib/runtime/product-runtime"
+import { recordOperationalEvent } from "@/lib/server/telemetry"
 
 type LocalBucket = {
   count: number
@@ -59,6 +60,13 @@ export async function checkRateLimit(
   if (productRuntime().mode === "managed") {
     const limiter = getManagedLimiter(limit, windowSeconds)
     if (!limiter) {
+      recordOperationalEvent({
+        event: "rate_limit.unavailable",
+        level: "error",
+        outcome: "failed",
+        request,
+        attributes: { scope },
+      })
       return {
         allowed: false,
         status: 503,
@@ -67,6 +75,15 @@ export async function checkRateLimit(
       } as const
     }
     const result = await limiter.limit(identifier)
+    if (!result.success) {
+      recordOperationalEvent({
+        event: "rate_limit.denied",
+        level: "warn",
+        outcome: "denied",
+        request,
+        attributes: { scope, statusCode: 429 },
+      })
+    }
     return {
       allowed: result.success,
       status: result.success ? 200 : 429,
@@ -96,6 +113,15 @@ export async function checkRateLimit(
   current.count += 1
   localBuckets.set(key, current)
   const allowed = current.count <= limit
+  if (!allowed) {
+    recordOperationalEvent({
+      event: "rate_limit.denied",
+      level: "warn",
+      outcome: "denied",
+      request,
+      attributes: { scope, statusCode: 429 },
+    })
+  }
   return {
     allowed,
     status: allowed ? 200 : 429,

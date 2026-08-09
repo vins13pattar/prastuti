@@ -39,6 +39,7 @@ See [local development](docs/LOCAL_DEVELOPMENT.md) for the supported modes and v
 - `apps/web`: working Next.js and shadcn vertical slice.
 - `docs/architecture`: product architecture decisions.
 - `docs/OPEN_SOURCE_READINESS.md`: public-release checklist and remaining gates.
+- `docs/OBSERVABILITY.md`: telemetry, redaction, trace export, and alerting contract.
 
 ## Architecture direction
 

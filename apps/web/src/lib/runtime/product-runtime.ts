@@ -74,6 +74,11 @@ function resolveMode(environment: Environment): ProductRuntimeMode {
 
 export function productRuntime(environment: Environment = process.env) {
   const mode = resolveMode(environment)
+  const telemetryExporter = environment.VERCEL
+    ? "vercel-collector"
+    : environment.OTEL_EXPORTER_OTLP_ENDPOINT
+      ? "otlp"
+      : "console-only"
   const missingForManagedDeployment = managedIntegrations.flatMap(
     (integration) =>
       integration.environment.filter((key) => !environment[key]),
@@ -97,5 +102,10 @@ export function productRuntime(environment: Environment = process.env) {
     readyForManagedDeployment: missingForManagedDeployment.length === 0,
     missingForManagedDeployment,
     integrations,
+    telemetry: {
+      instrumentation: "opentelemetry",
+      exporter: telemetryExporter,
+      externallyExported: telemetryExporter !== "console-only",
+    },
   } as const
 }
