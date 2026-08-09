@@ -6,9 +6,9 @@ allowBuilds:
   unrs-resolver: true
 
 auditConfig:
-  # Workflow 4.6.1 still carries brace-expansion 1.x/2.x through build-only
-  # CLI packages. Prastuti does not pass request data to their glob APIs. The
-  # runtime-facing 5.x path is pinned to the patched release below.
+  # Workflow still carries brace-expansion 1.x/2.x through build-only CLI
+  # packages. Prastuti does not pass request data to their glob APIs. The
+  # runtime-facing 5.x paths resolve to patched releases below.
   ignoreGhsas:
     - GHSA-mh99-v99m-4gvg
 
@@ -16,5 +16,9 @@ overrides:
   "@esbuild-kit/core-utils>esbuild": 0.25.12
   "@modelcontextprotocol/sdk>@hono/node-server": 2.0.10
   brace-expansion@5.0.7: 5.0.8
-  postcss@<=8.5.11: 8.5.22
+  "nanoid@>=3.0.0 <3.3.17": 3.3.17
+  "nanoid@>=5.0.0 <5.1.16": 5.1.16
+  postcss@<=8.5.22: 8.5.23
   sharp@<0.35.0: 0.35.3
+  "undici@>=6.0.0 <6.28.0": 6.28.0
+  "undici@>=7.0.0 <7.29.0": 7.29.0
